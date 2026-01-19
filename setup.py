@@ -116,7 +116,7 @@ ext_modules = [
 ]
 
 setup(
-    name="micrograd-kernels",
+    name="pygrad",
     version="0.12.61",
     packages=find_packages(),
     package_dir={"": "."},

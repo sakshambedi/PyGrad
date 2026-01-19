@@ -1,6 +1,6 @@
-# MicroGrad C++ Kernel Development Guide
+# PyGrad C++ Kernel Development Guide
 
-This document provides comprehensive guidance for developing and compiling the C++ kernel components of MicroGrad.
+This document provides comprehensive guidance for developing and compiling the C++ kernel components of PyGrad.
 
 ## Table of Contents
 
@@ -188,7 +188,7 @@ ctest --output-on-failure
 ```bash
 # Clone and setup
 git clone <repository>
-cd micrograd
+cd pygrad
 
 # Install dependencies
 ./build.sh --install-deps

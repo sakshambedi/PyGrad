@@ -1,8 +1,8 @@
-# Micrograd - Current State
+# PyGrad - Current State
 
-*Last updated: January 2025*
+_Last updated: January 2025_
 
-This document provides a comprehensive overview of the micrograd ML library's current implementation status, architecture, and roadmap considerations.
+This document provides a comprehensive overview of the pygrad ML library's current implementation status, architecture, and roadmap considerations.
 
 ## Architecture Overview
 
@@ -30,61 +30,61 @@ Python Layer (grad/)          C++ Layer (kernels/)
 
 ### Core Components
 
-| Component | Status | Location | Notes |
-|-----------|--------|----------|-------|
-| **Tensor** | Complete | `grad/tensor.py` | Full n-dimensional array with strides |
-| **Buffer** | Complete | `grad/buffer.py` | C++ backend wrapper |
-| **DType** | Complete | `grad/dtype.py` | 11 types with upcasting |
-| **Device** | Stub | `grad/device.py` | Placeholder for GPU support |
-| **Function** | Complete | `grad/autograd/function.py` | Base class for autograd |
-| **Operations** | Partial | `grad/autograd/ops.py` | See operation table below |
+| Component      | Status   | Location                    | Notes                                 |
+| -------------- | -------- | --------------------------- | ------------------------------------- |
+| **Tensor**     | Complete | `grad/tensor.py`            | Full n-dimensional array with strides |
+| **Buffer**     | Complete | `grad/buffer.py`            | C++ backend wrapper                   |
+| **DType**      | Complete | `grad/dtype.py`             | 11 types with upcasting               |
+| **Device**     | Stub     | `grad/device.py`            | Placeholder for GPU support           |
+| **Function**   | Complete | `grad/autograd/function.py` | Base class for autograd               |
+| **Operations** | Partial  | `grad/autograd/ops.py`      | See operation table below             |
 
 ### Tensor Operations
 
 #### Creation Methods
 
-| Method | Status | Description |
-|--------|--------|-------------|
-| `Tensor(data)` | Complete | From Python list or scalar |
-| `Tensor.zeros()` | Complete | Zero-filled tensor |
-| `Tensor.ones()` | Complete | One-filled tensor |
-| `Tensor.arange()` | Complete | Range tensor |
-| `Tensor.randn()` | Complete | Random normal distribution |
-| `Tensor.full()` | Complete | Fill with specific value |
+| Method            | Status   | Description                |
+| ----------------- | -------- | -------------------------- |
+| `Tensor(data)`    | Complete | From Python list or scalar |
+| `Tensor.zeros()`  | Complete | Zero-filled tensor         |
+| `Tensor.ones()`   | Complete | One-filled tensor          |
+| `Tensor.arange()` | Complete | Range tensor               |
+| `Tensor.randn()`  | Complete | Random normal distribution |
+| `Tensor.full()`   | Complete | Fill with specific value   |
 
 #### Shape Operations
 
-| Method | Status | Description |
-|--------|--------|-------------|
-| `view()` | Complete | Reshape without copy |
-| `reshape()` | Complete | Reshape with optional copy |
-| `transpose()` | Complete | Swap two dimensions |
-| `permute()` | Complete | Arbitrary dimension reordering |
-| `expand()` | Complete | Broadcast to larger shape |
+| Method        | Status   | Description                    |
+| ------------- | -------- | ------------------------------ |
+| `view()`      | Complete | Reshape without copy           |
+| `reshape()`   | Complete | Reshape with optional copy     |
+| `transpose()` | Complete | Swap two dimensions            |
+| `permute()`   | Complete | Arbitrary dimension reordering |
+| `expand()`    | Complete | Broadcast to larger shape      |
 
 #### Indexing
 
-| Operation | Status | Description |
-|-----------|--------|-------------|
+| Operation     | Status   | Description                |
+| ------------- | -------- | -------------------------- |
 | `__getitem__` | Complete | Multi-dimensional indexing |
-| `__setitem__` | Complete | Element/slice assignment |
+| `__setitem__` | Complete | Element/slice assignment   |
 
 ### Arithmetic Operations
 
-| Operation | Forward | Backward | SIMD | Notes |
-|-----------|---------|----------|------|-------|
-| Add | Complete | Complete | Yes | Full autograd support |
-| Sub | Complete | Complete | Yes | Full autograd support |
-| Neg | Complete | Complete | Yes | Full autograd support |
-| Mul | Complete | **Missing** | Yes | Forward only |
-| Div | Complete | **Missing** | Yes | Forward only |
-| Pow | Complete | **Missing** | Yes | Forward only |
+| Operation | Forward  | Backward    | SIMD | Notes                 |
+| --------- | -------- | ----------- | ---- | --------------------- |
+| Add       | Complete | Complete    | Yes  | Full autograd support |
+| Sub       | Complete | Complete    | Yes  | Full autograd support |
+| Neg       | Complete | Complete    | Yes  | Full autograd support |
+| Mul       | Complete | **Missing** | Yes  | Forward only          |
+| Div       | Complete | **Missing** | Yes  | Forward only          |
+| Pow       | Complete | **Missing** | Yes  | Forward only          |
 
 ### Reduction Operations
 
-| Operation | Status | Notes |
-|-----------|--------|-------|
-| `sum()` | Partial | Basic sum, missing `axis`/`keepdim` parameters |
+| Operation | Status  | Notes                                          |
+| --------- | ------- | ---------------------------------------------- |
+| `sum()`   | Partial | Basic sum, missing `axis`/`keepdim` parameters |
 
 ---
 
@@ -110,6 +110,7 @@ for (size_t i = simd_end; i < n; ++i) {
 ```
 
 **Performance characteristics:**
+
 - SIMD threshold: operations < 16 elements use scalar path
 - Alignment-aware: separate aligned/unaligned code paths
 - Loop unrolling: 4x batches per iteration
@@ -125,21 +126,21 @@ for (size_t i = simd_end; i < n; ++i) {
 
 ## Data Types
 
-| Type | Size | Priority | Format |
-|------|------|----------|--------|
-| int8 | 1 | 1 | 'b' |
-| uint8 | 1 | 2 | 'B' |
-| int16 | 2 | 3 | 'h' |
-| uint16 | 2 | 4 | 'H' |
-| int32 | 4 | 5 | 'i' |
-| uint32 | 4 | 6 | 'I' |
-| int64 | 8 | 7 | 'q' |
-| uint64 | 8 | 8 | 'Q' |
-| float16 | 2 | 9 | 'e' |
-| **float32** | 4 | 10 | 'f' |
-| float64 | 8 | 11 | 'd' |
+| Type        | Size | Priority | Format |
+| ----------- | ---- | -------- | ------ |
+| int8        | 1    | 1        | 'b'    |
+| uint8       | 1    | 2        | 'B'    |
+| int16       | 2    | 3        | 'h'    |
+| uint16      | 2    | 4        | 'H'    |
+| int32       | 4    | 5        | 'i'    |
+| uint32      | 4    | 6        | 'I'    |
+| int64       | 8    | 7        | 'q'    |
+| uint64      | 8    | 8        | 'Q'    |
+| float16     | 2    | 9        | 'e'    |
+| **float32** | 4    | 10       | 'f'    |
+| float64     | 8    | 11       | 'd'    |
 
-*float32 is the default dtype*
+_float32 is the default dtype_
 
 **Upcasting rules**: Operations between different types promote to the higher priority type.
 
@@ -149,20 +150,20 @@ for (size_t i = simd_end; i < n; ++i) {
 
 ### C++ Tests (GoogleTest)
 
-| Test File | Coverage |
-|-----------|----------|
+| Test File             | Coverage                                          |
+| --------------------- | ------------------------------------------------- |
 | `test_cpu_kernel.cpp` | Buffer initialization, indexing, dtype conversion |
-| `test_operations.cpp` | Binary/unary SIMD operations |
-| `test_vecbuffer.cpp` | Container behavior, alignment |
-| `test_dtype_enum.cpp` | Type system |
+| `test_operations.cpp` | Binary/unary SIMD operations                      |
+| `test_vecbuffer.cpp`  | Container behavior, alignment                     |
+| `test_dtype_enum.cpp` | Type system                                       |
 
 ### Python Tests (pytest)
 
-| Test File | Coverage | Test Count |
-|-----------|----------|------------|
-| `tensor_test.py` | Creation, shapes, indexing, utilities | ~405 cases |
-| `ops_test.py` | All arithmetic operations, gradients | ~100+ cases |
-| `test_buffer.py` | Buffer creation, access, types | ~80+ cases |
+| Test File        | Coverage                              | Test Count  |
+| ---------------- | ------------------------------------- | ----------- |
+| `tensor_test.py` | Creation, shapes, indexing, utilities | ~405 cases  |
+| `ops_test.py`    | All arithmetic operations, gradients  | ~100+ cases |
+| `test_buffer.py` | Buffer creation, access, types        | ~80+ cases  |
 
 **Skipped tests**: Sum operations, full transpose support
 
@@ -172,20 +173,20 @@ for (size_t i = simd_end; i < n; ++i) {
 
 ### Dependencies (via CMake FetchContent)
 
-| Dependency | Version | Purpose |
-|------------|---------|---------|
-| Eigen | 3.4.0 | Linear algebra, alignment utilities |
-| pybind11 | 2.11.1 | Python bindings |
-| GoogleTest | 1.14.0 | C++ testing |
-| xsimd | latest | SIMD operations |
+| Dependency | Version | Purpose                             |
+| ---------- | ------- | ----------------------------------- |
+| Eigen      | 3.4.0   | Linear algebra, alignment utilities |
+| pybind11   | 2.11.1  | Python bindings                     |
+| GoogleTest | 1.14.0  | C++ testing                         |
+| xsimd      | latest  | SIMD operations                     |
 
 ### Platform-Specific Flags
 
-| Platform | Flags |
-|----------|-------|
-| x86_64 | `-mavx2 -mfma -msse4.2 -O3` |
-| Apple Silicon | `-mcpu=apple-m1 -O3` |
-| Windows (MSVC) | `/arch:AVX2 /O2` |
+| Platform       | Flags                       |
+| -------------- | --------------------------- |
+| x86_64         | `-mavx2 -mfma -msse4.2 -O3` |
+| Apple Silicon  | `-mcpu=apple-m1 -O3`        |
+| Windows (MSVC) | `/arch:AVX2 /O2`            |
 
 ### Make Targets
 
@@ -249,11 +250,11 @@ Tensor → Buffer → dispatch() → CPU (xsimd)
 
 ### Integration Points
 
-| File | Changes Needed |
-|------|----------------|
-| `grad/device.py` | Implement actual device dispatch |
-| `grad/buffer.py:17-30` | Backend-specific buffer creation |
-| `CMakeLists.txt` | Conditional GPU library compilation |
+| File                   | Changes Needed                      |
+| ---------------------- | ----------------------------------- |
+| `grad/device.py`       | Implement actual device dispatch    |
+| `grad/buffer.py:17-30` | Backend-specific buffer creation    |
+| `CMakeLists.txt`       | Conditional GPU library compilation |
 
 ### Proposed Directory Structure
 
@@ -328,12 +329,12 @@ kernels/
 
 ## Recent Development
 
-| Commit | Description |
-|--------|-------------|
-| c8d2dc7 | Add Buffer `__setitem__` support |
-| 8821860 | Merge Python-C integration phase 2 |
+| Commit  | Description                                |
+| ------- | ------------------------------------------ |
+| c8d2dc7 | Add Buffer `__setitem__` support           |
+| 8821860 | Merge Python-C integration phase 2         |
 | 970d72d | Optimize binary kernels with unrolled SIMD |
-| 3bb7b82 | Refactor elementwise ops, add `expand()` |
-| e517dca | Implement power and negation ops |
+| 3bb7b82 | Refactor elementwise ops, add `expand()`   |
+| e517dca | Implement power and negation ops           |
 
 **Active development areas**: Python-C integration, SIMD optimization, operation implementations

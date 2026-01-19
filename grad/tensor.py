@@ -264,10 +264,10 @@ class Tensor:
         return self._stride if dim is None else self._stride[dim % len(self.shape)]
 
     @staticmethod
-    def matmul(t1: Tensor, t2: Tensor, /, dtype: dtypes | None = None): ...  # noqa : E704
+    def matmul(t1: Tensor, t2: Tensor, /, dtype: dtypes | None = None): ...  # noqa
 
     @staticmethod
-    def mean(t: Tensor, /, axis: int = 0) -> Tensor: ...  # noqa : E704
+    def mean(t: Tensor, /, axis: int = 0) -> Tensor: ...  # noqa
 
     @staticmethod
     def sum(

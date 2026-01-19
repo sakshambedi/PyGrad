@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cross-platform build script for micrograd project.
+Cross-platform build script for pygrad project.
 This script handles building the C++ components and Python extensions.
 """
 
@@ -197,7 +197,7 @@ def python_build(env, develop=False, clean=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build script for micrograd project")
+    parser = argparse.ArgumentParser(description="Build script for pygrad project")
     parser.add_argument(
         "--clean", action="store_true", help="Clean build directories before building"
     )

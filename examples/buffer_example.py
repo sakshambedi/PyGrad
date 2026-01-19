@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example script demonstrating how to use the micrograd C++ kernel
+Example script demonstrating how to use the pygrad C++ kernel
 """
 
 import sys
@@ -105,7 +105,7 @@ def test_edge_cases():
 
 def main():
     """Main test function"""
-    print("micrograd C++ Kernel Example")
+    print("pygrad C++ Kernel Example")
     print("============================")
 
     tests = [
