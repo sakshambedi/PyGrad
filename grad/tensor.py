@@ -10,6 +10,8 @@ from grad.buffer import Buffer
 from grad.dtype import DType, DTypeLike, dtypes
 from grad.utils.misc import _nd_indices, tensor_stride
 
+__all__ = ["Tensor", "dtypes"]
+
 
 class Tensor:
     """Tiny, PyTorch‑like dense tensor backed by a contiguous buffer."""

@@ -35,7 +35,6 @@ class DType(metaclass=DTypeMetaClass):
 
 
 class dtypes:
-    # void: Final[DType] = DType.new(-1, 0, "void", None) # not supported
     bool: Final[DType] = DType.new(0, 1, "bool", "?")
     int8: Final[DType] = DType.new(1, 1, "int8", "b")
     uint8: Final[DType] = DType.new(2, 1, "uint8", "B")
