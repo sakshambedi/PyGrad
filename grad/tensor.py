@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from collections.abc import Generator, Iterable, Sequence
 from math import prod as _prod
-from typing import Any, Optional, overload
+from typing import Any, Optional
 
 from grad.autograd.function import Function
 from grad.buffer import Buffer
@@ -262,12 +262,6 @@ class Tensor:
             raise AttributeError("Tensor with data is not initialized yet!")
         return id(self.buffer)
 
-    @overload
-    def stride(self) -> tuple[int, ...]: ...  # noqa : E704
-
-    @overload
-    def stride(self, dim: int) -> int: ...  # noqa : E704
-
     def stride(self, dim: int | None = None) -> tuple[int, ...] | int:
         """Return the stride of the tensor. If dim is specified, return the stride for that dimension."""
         return self._stride if dim is None else self._stride[dim % len(self.shape)]
@@ -340,16 +334,34 @@ class Tensor:
 
     def __getitem__(self, index):
         """Access tensor data by index."""
+        # if self.storage is None:
+        #     raise AttributeError("Tensor with a storage has not been initialized yet!")
         if not isinstance(index, tuple):
             index = (index,)
         if len(index) != len(self.shape):
-            raise IndexError("Wrong number of indices")
-        if self.storage is not None:
-            offsetval = self._offset(index)
-            val = self.storage[offsetval]
-            return val
+            raise IndexError(
+                f"Incorrect number of indices for tensor of shape {self.shape!r}. "
+                f"Expected {len(self.shape)} index{'es' if len(self.shape) != 1 else ''}, "
+                f"but got {len(index)}: {index!r}."
+            )
+        norm = []
+        for axis, (idx, dim) in enumerate(zip(index, self.shape)):
+            if not isinstance(idx, int):
+                raise TypeError(
+                    f"indices must be integers, got {type(idx).__name__} at axis {axis}"
+                )
+            print(f"axis:  index & shape : {axis} : {list(zip(index, self.shape))}")
 
-        raise AttributeError("Tensor with a storage has not been initialized yet!")
+            if idx < 0:
+                idx += dim
+            if idx >= dim or idx < 0:
+                raise IndexError(
+                    f"index {index[axis]} is out of bounds for axis {axis} with size {dim}"
+                )
+            norm.append(idx)
+
+        offsetval = self._offset(tuple(norm))
+        return self.storage[offsetval]
 
     def to_numpy(self):
         """Convert tensor to numpy array."""
@@ -364,15 +376,29 @@ class Tensor:
     def __setitem__(self, idx, value):
         """Standard function for setting values by indexing"""
         if not isinstance(idx, tuple):
-            idx = (idx,)  # incase of 1d tensor
+            idx = (idx,)  # in case of 1d tensor
         if len(idx) != len(self.shape):
             raise IndexError(
-                f"Indexing a tensor with incorrect dimension. Tensor with shape: ({self.shape})"
+                f"Incorrect number of indices for tensor of shape {self.shape!r}. "
+                f"Expected {len(self.shape)} index{'es' if len(self.shape) != 1 else ''}, "
+                f"but got {len(idx)}: {idx!r}."
             )
         if self.storage is None:
             raise AttributeError("Tensor with a storage has not been initialized yet!")
 
-        offsetval = self._offset(index=idx)
+        norm = []
+        for axis, (i, dim) in enumerate(zip(idx, self.shape)):
+            if not isinstance(i, int):
+                raise TypeError(f"indices must be integers, got {type(i).__name__} at axis {axis}")
+            if i < 0:
+                i += dim
+            if i >= dim or i < 0:
+                raise IndexError(
+                    f"index {idx[axis]} is out of bounds for axis {axis} with size {dim}"
+                )
+            norm.append(i)
+
+        offsetval = self._offset(index=tuple(norm))
         self.storage[offsetval] = value
 
     def __repr__(self) -> str:

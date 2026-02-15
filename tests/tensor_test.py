@@ -3,12 +3,6 @@ import pytest
 
 from grad import Tensor, dtypes
 
-requires_working_transpose = pytest.mark.skip(
-    reason="transpose functionality not fully implemented yet"
-)
-requires_working_indexing = pytest.mark.skip(
-    reason="multi-dimensional indexing not fully implemented yet"
-)
 requires_view_ops = pytest.mark.skip(reason="operations on views not fully implemented yet")
 
 
@@ -197,7 +191,6 @@ class TestTensorShape:
         with pytest.raises(ValueError):
             t.reshape(4, 2)  # 4*2 != 6
 
-    @requires_working_transpose
     def test_transpose(self):
         t = Tensor([[1, 2, 3], [4, 5, 6]])
         t_transposed = t.transpose(0, 1)
@@ -207,16 +200,13 @@ class TestTensorShape:
         assert t_transposed[1, 0] == 2
         assert t_transposed[2, 1] == 6
 
-        # Test transpose with same storage
         assert list(t.buffer) == list(t_transposed.buffer)
 
         # Test transpose with same dimensions
         t_same = t.transpose(0, 0)
         assert t_same is t
 
-    @requires_working_transpose
     def test_T(self):
-        # Test transpose property on 2D tensor
         t = Tensor([[1, 2, 3], [4, 5, 6]])
         t_T = Tensor.T(t)
         assert t_T.shape == (3, 2)
@@ -225,7 +215,6 @@ class TestTensorShape:
         assert t_T[1, 0] == 2
         assert t_T[2, 1] == 6
 
-        # Test transpose property on 1D tensor (should be no-op)
         t = Tensor([1, 2, 3])
         t_T = Tensor.T(t)
         assert t_T.shape == (3,)
@@ -245,28 +234,24 @@ class TestTensorShape:
 
     def test_permute(self):
         t = Tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
-        # Permute from (2, 2, 2) to (2, 2, 2)
+
         t_perm = Tensor.permute(t, 0, 1, 2)
         assert t_perm.shape == (2, 2, 2)
         assert t_perm[0, 0, 0] == 1
         assert t_perm[1, 1, 1] == 8
 
-        # Permute from (2, 2, 2) to (2, 2, 2)
         t_perm = Tensor.permute(t, 2, 1, 0)
         assert t_perm.shape == (2, 2, 2)
         assert t_perm[0, 0, 0] == 1
         assert t_perm[0, 0, 1] == 5
         assert t_perm[1, 1, 1] == 8
 
-        # Test with wrong number of dimensions
         with pytest.raises(ValueError):
             Tensor.permute(t, 0, 1)
 
-        # Test with duplicate indices
         with pytest.raises(ValueError):
             Tensor.permute(t, 0, 0, 1)
 
-        # Test with invalid indices
         with pytest.raises(ValueError):
             Tensor.permute(t, 0, 1, 3)
 
@@ -276,65 +261,107 @@ class TestTensorAccess:
         t = Tensor([1, 2, 3, 4])
         assert t[0] == 1
         assert t[2] == 3
+        assert t[-1] == 4
+        assert t[-4] == 1
 
         with pytest.raises(IndexError):
             t[4]  # Out of bounds
 
-    @requires_working_indexing
+        with pytest.raises(IndexError):
+            t[-5]  # Out of bounds
+
     def test_getitem_2d(self):
         t = Tensor([[1, 2, 3], [4, 5, 6]])
         assert t[0, 0] == 1
         assert t[0, 2] == 3
         assert t[1, 1] == 5
+        assert t[-1, -1] == 6
+        assert t[-2, -3] == 1
 
         with pytest.raises(IndexError):
-            t[0, 3]  # Out of bounds
+            t[0, 3]
 
-    @requires_working_indexing
+        with pytest.raises(IndexError):
+            t[2, 3]
+
+        with pytest.raises(IndexError):
+            t[-3, 0]
+
+        with pytest.raises(IndexError):
+            t[0, -4]
+
     def test_getitem_3d(self):
         t = Tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         assert t[0, 0, 0] == 1
         assert t[0, 1, 1] == 4
         assert t[1, 1, 1] == 8
+        assert t[-1, -1, -1] == 8
+        assert t[-2, -2, -2] == 1
 
         with pytest.raises(IndexError):
             t[0, 0, 2]  # Out of bounds
 
-    @requires_working_indexing
+        with pytest.raises(IndexError):
+            t[2, 0, 0]  # Out of bounds
+
+        with pytest.raises(IndexError):
+            t[-3, 0, 0]  # Out of bounds
+
     def test_setitem_1d(self):
         t = Tensor([1, 2, 3, 4])
         t[0] = 10
         t[2] = 30
-        assert list(t.buffer) == [10, 2, 30, 4]
+        t[-1] = 40
+        assert list(t.buffer) == [10, 2, 30, 40]
 
         with pytest.raises(IndexError):
             t[4] = 50  # Out of bounds
 
-    @requires_working_indexing
+        with pytest.raises(IndexError):
+            t[-5] = 50  # Out of bounds
+
     def test_setitem_2d(self):
         t = Tensor([[1, 2, 3], [4, 5, 6]])
         t[0, 0] = 10
         t[0, 2] = 30
         t[1, 1] = 50
-        assert t[0, 0] == 10
+        t[-1, -1] = 60
+        t[-2, -3] = 11
+        assert t[0, 0] == 11
         assert t[0, 2] == 30
         assert t[1, 1] == 50
+        assert t[1, 2] == 60
 
         with pytest.raises(IndexError):
             t[0, 3] = 40  # Out of bounds
 
-    @requires_working_indexing
+        with pytest.raises(IndexError):
+            t[2, 0] = 40  # Out of bounds
+
+        with pytest.raises(IndexError):
+            t[-3, 0] = 40  # Out of bounds
+
+        with pytest.raises(IndexError):
+            t[0, -4] = 40  # Out of bounds
+
     def test_setitem_3d(self):
         t = Tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
         t[0, 0, 0] = 10
         t[0, 1, 1] = 40
         t[1, 1, 1] = 80
+        t[-1, -1, -1] = 81
         assert t[0, 0, 0] == 10
         assert t[0, 1, 1] == 40
-        assert t[1, 1, 1] == 80
+        assert t[1, 1, 1] == 81
 
         with pytest.raises(IndexError):
             t[0, 0, 2] = 20  # Out of bounds
+
+        with pytest.raises(IndexError):
+            t[2, 0, 0] = 20  # Out of bounds
+
+        with pytest.raises(IndexError):
+            t[-3, 0, 0] = 20  # Out of bounds
 
 
 class TestTensorUtilities:

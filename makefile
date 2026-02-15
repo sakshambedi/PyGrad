@@ -50,6 +50,8 @@ help:
 	@echo "  make test           # Build and run tests"
 	@echo "  make clean          # Clean build directory"
 
+count-lines:
+	@tokei . --exclude .venv
 
 build: ## Build the project in Release mode
 	@echo "Building in Release mode..."
