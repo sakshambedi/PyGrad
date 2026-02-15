@@ -147,17 +147,6 @@ make setup-env
 make build
 ```
 
-#### Windows
-
-```bash
-# Requires Visual Studio Build Tools with C++ support
-# Install CMake from https://cmake.org/download/
-
-git clone https://github.com/sakshambedi/micrograd.git
-cd micrograd
-python build.py
-```
-
 ### Build Commands
 
 | Command          | Description                 |
@@ -429,9 +418,3 @@ pygrad is inspired by:
 MIT License - See [LICENSE](LICENSE) for details.
 
 Copyright (c) 2025 Saksham Bedi
-
----
-
-<p align="center">
-  <em>Built for learning</em> | <a href="https://github.com/sakshambedi/micrograd">GitHub</a>
-</p>
