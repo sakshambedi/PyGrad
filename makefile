@@ -56,26 +56,34 @@ count-lines:
 build: ## Build the project in Release mode
 	@echo "Building in Release mode..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -Wno-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -DPYGRAD_BUILD_KERNEL_TESTS=OFF -Wno-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 	@cd $(BUILD_DIR) && $(CMAKE_BUILD) $(CMAKE_CONFIG)
 	@echo "Build completed successfully!"
 
 debug: ## Build the project in Debug mode
 	@echo "Building in Debug mode..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3)  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -DPYGRAD_BUILD_KERNEL_TESTS=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 	@cd $(BUILD_DIR) && $(CMAKE_BUILD)
 	@echo "Debug build completed successfully!"
 
 release: build
 
 # Test targets
-test: build
+test: ## Build with C++ tests enabled and run tests
+	@echo "Building in Release mode with C++ tests enabled..."
+	@mkdir -p $(BUILD_DIR)
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -DPYGRAD_BUILD_KERNEL_TESTS=ON -Wno-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE_BUILD) $(CMAKE_CONFIG)
 	@echo "Running tests..."
 	@cd $(BUILD_DIR) && (ctest --output-on-failure || $(CMAKE) --build . --target test || echo "Warning: Some tests may have failed")
 	@echo "Tests completed!"
 
-test-debug: debug ## Build in debug mode and run tests
+test-debug: ## Build in debug mode with C++ tests enabled and run tests
+	@echo "Building in Debug mode with C++ tests enabled..."
+	@mkdir -p $(BUILD_DIR)
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -DPYGRAD_BUILD_KERNEL_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE_BUILD)
 	@echo "Running tests (debug build)..."
 	@cd $(BUILD_DIR) && (ctest --output-on-failure || $(CMAKE) --build . --target test || echo "Warning: Some tests may have failed")
 	@echo "Tests completed!"

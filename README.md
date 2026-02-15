@@ -1,11 +1,15 @@
-# pygrad
+# PyGrad
+
+<p align="center">
+  <img src="imgs/pygrad-banner.webp" alt="PyGrad banner" width="100%">
+</p>
 
 <p align="center">
   <strong>An educational tensor/autograd library with a high-performance C++ backend</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/sakshambedi/micrograd/releases"><img src="https://img.shields.io/badge/version-0.12.61-blue.svg" alt="Version 0.12.61"></a>
+  <a href="https://github.com/sakshambedi/PyGrad/releases"><img src="https://img.shields.io/badge/version-0.12.61-blue.svg" alt="Version 0.12.61"></a>
   <a href="#"><img src="https://img.shields.io/badge/status-beta-orange.svg" alt="Beta Status"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python 3.8+"></a>
@@ -20,7 +24,7 @@
 
 ## Overview
 
-**pygrad** is a minimal, educational tensor library focused on learning how tensor storage, shape/stride views, and automatic differentiation systems work.
+**PyGrad** is a minimal, educational tensor library focused on learning how tensor storage, shape/stride views, and automatic differentiation systems work.
 
 It provides:
 
@@ -90,8 +94,8 @@ Project metadata lives in `pyproject.toml` with package name `pygrad`.
 ### Quick setup (Makefile)
 
 ```bash
-git clone https://github.com/sakshambedi/micrograd.git
-cd micrograd
+git clone https://github.com/sakshambedi/PyGrad.git
+cd PyGrad
 
 make setup-env      # install/check system prerequisites
 make build          # build native extension(s)
@@ -184,7 +188,7 @@ Examples:
 ## Project Structure
 
 ```text
-micrograd/
+pygrad/
 ├── grad/
 │   ├── tensor.py              # Core Tensor API
 │   ├── dtype.py               # DType definitions

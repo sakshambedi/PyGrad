@@ -19,6 +19,9 @@ endif()
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -DNDEBUG ${COMMON_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 ${COMMON_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_FLAGS}")
+option(PYGRAD_BUILD_KERNEL_TESTS
+       "Build C++ kernel tests (requires googletest and network if not cached)"
+       OFF)
 
 # Set up vcpkg toolchain if not already set
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -34,10 +37,10 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
         set(CMAKE_TOOLCHAIN_FILE
             "/usr/local/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING
             "Vcpkg toolchain file")
-    elseif(APPLE AND EXISTS
-    "/Users/${USER}/vcpkg/scripts/buildsystems/vcpkg.cmake")
+    elseif(APPLE AND DEFINED ENV{HOME} AND EXISTS
+    "$ENV{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake")
         set(CMAKE_TOOLCHAIN_FILE
-            "/Users/${USER}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            "$ENV{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake"
             CACHE STRING "Vcpkg toolchain file")
     endif()
 endif()
@@ -48,6 +51,8 @@ include(FetchContent)
 # DO NOT REVOVE THE NEXT TWO LINES, IF REMOVED IT STARTS EIGEN TEST SUITES
 set(BUILD_TESTING OFF CACHE BOOL "Disable Eigen tests")
 set(EIGEN_BUILD_TESTING OFF CACHE BOOL "Disable Eigen tests")
+set(EIGEN_BUILD_DOC OFF CACHE BOOL "Disable Eigen docs" FORCE)
+set(EIGEN_BUILD_PKGCONFIG OFF CACHE BOOL "Disable Eigen pkg-config file" FORCE)
 FetchContent_Declare(
     eigen
     URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
@@ -69,7 +74,9 @@ find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 if(DEFINED ENV{XSIMD_INCLUDE_DIR})
     set(XSIMD_INCLUDE_DIR $ENV{XSIMD_INCLUDE_DIR})
 elseif(APPLE)
-    set(XSIMD_INCLUDE_DIR "/Users/${USER}/vcpkg/installed/arm64-osx/include")
+    if(DEFINED ENV{HOME})
+        set(XSIMD_INCLUDE_DIR "$ENV{HOME}/vcpkg/installed/arm64-osx/include")
+    endif()
     if(NOT EXISTS "${XSIMD_INCLUDE_DIR}/xsimd/xsimd.hpp")
         set(XSIMD_INCLUDE_DIR "/opt/homebrew/include")
     endif()
@@ -109,13 +116,15 @@ target_include_directories(cpu_kernel PRIVATE
     ${XSIMD_INCLUDE_DIR}
 )
 
-# Fetch GoogleTest
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-)
-FetchContent_MakeAvailable(googletest)
+if(PYGRAD_BUILD_KERNEL_TESTS)
+    # Fetch GoogleTest only when tests are requested.
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+    )
+    FetchContent_MakeAvailable(googletest)
 
-# Enable testing
-enable_testing()
-add_subdirectory(tests/kernels)
+    # Enable testing
+    enable_testing()
+    add_subdirectory(tests/kernels)
+endif()

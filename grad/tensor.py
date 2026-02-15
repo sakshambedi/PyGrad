@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from collections.abc import Generator, Iterable, Sequence
 from math import prod as _prod
-from typing import Any, Optional
+from typing import Any
 
 from grad.autograd.function import Function
 from grad.buffer import Buffer
@@ -38,9 +38,9 @@ class Tensor:
     ) -> None:
         self.device = device
         self.requires_grad = requires_grad
-        self.grad: Optional[Tensor] = None
-        self.storage: Optional[Buffer] = None
-        self.grad_fn: Optional[Function] = None
+        self.grad: Tensor | None = None
+        self.storage: Buffer | None = None
+        self.grad_fn: Function | None = None
         self._contiguous: bool = True
         self.base_offset: int = 0
 
@@ -275,7 +275,7 @@ class Tensor:
     @staticmethod
     def sum(
         t: Tensor,
-        # dim: Optional[int] = None, # TODO: ADD functionality
+        # dim: int | None = None, # TODO: ADD functionality
         # keepdim: bool = False,
         *,
         dtype: DType | None = None,
@@ -422,7 +422,7 @@ class Tensor:
         *,
         dtype: DTypeLike = dtypes.float32,
         device: str = "cpu",
-        requires_grad: Optional[bool] = None,
+        requires_grad: bool | None = None,
     ) -> Tensor:
         """Internal method for creating tensors filled with a value."""
         inst: Tensor = cls.__new__(cls)

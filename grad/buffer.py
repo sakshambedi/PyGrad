@@ -3,7 +3,9 @@ from typing import Any
 
 from grad.device import Device
 from grad.dtype import DType, DTypeLike, to_dtype
-from grad.kernels import cpu_kernel  # type: ignore
+from grad.kernels import cpu_kernel
+
+__slot__ = ["Buffer"]
 
 
 class Buffer:
