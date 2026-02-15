@@ -10,6 +10,8 @@ from grad.buffer import Buffer
 from grad.dtype import DType, DTypeLike, dtypes
 from grad.utils.misc import _nd_indices, tensor_stride
 
+__all__ = ["Tensor", "dtypes"]
+
 
 class Tensor:
     """Tiny, PyTorch‑like dense tensor backed by a contiguous buffer."""
@@ -264,10 +266,10 @@ class Tensor:
         return self._stride if dim is None else self._stride[dim % len(self.shape)]
 
     @staticmethod
-    def matmul(t1: Tensor, t2: Tensor, /, dtype: dtypes | None = None): ...  # noqa : E704
+    def matmul(t1: Tensor, t2: Tensor, /, dtype: dtypes | None = None): ...  # noqa
 
     @staticmethod
-    def mean(t: Tensor, /, axis: int = 0) -> Tensor: ...  # noqa : E704
+    def mean(t: Tensor, /, axis: int = 0) -> Tensor: ...  # noqa
 
     @staticmethod
     def sum(

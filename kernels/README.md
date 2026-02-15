@@ -1,6 +1,6 @@
-# MicroGrad Build System Quick Reference
+# PyGrad Build System Quick Reference
 
-This is a quick reference for the MicroGrad C++ kernel build system.
+This is a quick reference for the PyGrad C++ kernel build system.
 
 ## Quick Start
 
@@ -80,7 +80,7 @@ make check
 ## Project Structure
 
 ```
-micrograd/
+pygrad/
 ├── kernels/                 # C++ kernel source
 │   ├── cpu_kernel.h/cpp    # Python bindings
 │   ├── vecbuffer.h/cpp     # SIMD vector buffer

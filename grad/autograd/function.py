@@ -3,8 +3,6 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-# from types import TracebackType
-
 __all__ = ["Function", "grad_enabled"]
 
 autograd_state = threading.local()

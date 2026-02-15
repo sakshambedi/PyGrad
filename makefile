@@ -1,4 +1,4 @@
-# MicroGrad Makefile
+# PyGrad Makefile
 # Provides convenient targets for building and testing the C++ kernel
 .PHONY: help build clean test install-deps debug release install uninstall setup-env
 
@@ -37,7 +37,7 @@ endif
 
 # Help target
 help:
-	@echo "MicroGrad C++ Kernel Build System"
+	@echo "PyGrad C++ Kernel Build System"
 	@echo "=================================="
 	@echo ""
 	@echo "Available targets:"
@@ -111,7 +111,7 @@ install: build ## Install the Python module
 
 uninstall: ## Uninstall the Python module
 	@echo "Uninstalling Python module..."
-	@$(PYTHON) -m pip uninstall -y micrograd
+	@$(PYTHON) -m pip uninstall -y pygrad
 	@echo "Uninstallation completed!"
 
 

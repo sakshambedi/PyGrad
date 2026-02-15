@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Basic operations example for micrograd tensor library
+Basic operations example for pygrad tensor library
 """
 
 from grad.dtype import dtypes
@@ -63,11 +63,11 @@ def test_math_operations():
     print(f"Division: {b} / {a} = {f}")
 
     # Scalar operations
-    g = a + 5
-    print(f"Add scalar: {a} + 5 = {g}")
+    # g = a + 5
+    # print(f"Add scalar: {a} + 5 = {g}")
 
-    h = a * 2
-    print(f"Multiply by scalar: {a} * 2 = {h}")
+    # h = a * 2
+    # print(f"Multiply by scalar: {a} * 2 = {h}")
 
 
 def test_shape_operations():
@@ -140,7 +140,7 @@ def test_autograd_basics():
 
 def main():
     """Run all examples"""
-    print("micrograd Tensor Library Examples")
+    print("pygrad Tensor Library Examples")
     print("================================")
 
     test_tensor_creation()
