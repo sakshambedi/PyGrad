@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
+import numpy as np
 from grad.autograd import operations  # type:ignore
 from grad.autograd.function import Function
 from grad.buffer import Buffer
@@ -52,6 +54,12 @@ def _unary_operation(ctx, a: Tensor, op_type: operations.UnaryOpType):
     return result
 
 
+def _safe_divide(numerator: Any, denominator: Any) -> Any:
+    if isinstance(denominator, (int, float)) and denominator == 0:
+        return math.copysign(math.inf, float(numerator))
+    return numerator / denominator
+
+
 class Add(Function):
     @staticmethod
     def forward(ctx: Function, a: Tensor, b: Tensor) -> Tensor:
@@ -82,11 +90,12 @@ class Mul(Function):
     def forward(ctx: Function, a: Tensor, b: Tensor) -> Tensor:
         """Element-wise multiplication of two tensors."""
         return _elementwise_operation(ctx, a, b, operations.BinaryOpType.MUL)
-        ...
 
     @staticmethod
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
-        pass
+        grad_output = grad_outputs[0]
+        a, b = ctx.saved_tensor
+        return b * grad_output, a * grad_output
 
 
 class Div(Function):
@@ -97,7 +106,11 @@ class Div(Function):
 
     @staticmethod
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
-        pass
+        grad_output = grad_outputs[0]
+        a, b = ctx.saved_tensor
+        grad_a = _safe_divide(grad_output, b)
+        grad_b = -_safe_divide(a * grad_output, b**2)
+        return grad_a, grad_b
 
 
 class Pow(Function):
@@ -108,9 +121,15 @@ class Pow(Function):
 
     @staticmethod
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
-        # Power rule: if y = x^n, then dy/dx = n*x^(n-1)
-        # Not implementing the full gradient for now
-        pass
+        grad_output = grad_outputs[0]
+        a, b = ctx.saved_tensor
+        grad_a = b * (a ** (b - 1)) * grad_output
+        if isinstance(a, Tensor):
+            ln_a = Tensor(np.log(a.to_numpy()).tolist(), dtype=a.dtype, device=a.device)
+        else:
+            ln_a = math.log(a)
+        grad_b = (a**b) * ln_a * grad_output
+        return grad_a, grad_b
 
 
 class Neg(Function):
