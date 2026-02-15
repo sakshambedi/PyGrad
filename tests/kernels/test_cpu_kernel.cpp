@@ -1020,19 +1020,19 @@ TEST(BufferMembersTest, RoundTripAndBounds) {
   py::scoped_interpreter guard{};
 
   Buffer fbuf(2, "float32");
-  fbuf.set_item<float>(0, 1.25f);
-  fbuf.set_item<float>(1, -2.5f);
+  fbuf.set_item_typed<float>(0, 1.25f);
+  fbuf.set_item_typed<float>(1, -2.5f);
   auto item0 = fbuf.get_item(0);
   auto item1 = fbuf.get_item(1);
   EXPECT_FLOAT_EQ(py::cast<float>(item0), 1.25f);
   EXPECT_FLOAT_EQ(py::cast<float>(item1), -2.5f);
 
-  EXPECT_THROW(static_cast<void>(fbuf.set_item<float>(2, 0.f)),
+  EXPECT_THROW(static_cast<void>(fbuf.set_item_typed<float>(2, 0.f)),
                std::out_of_range);
-  EXPECT_THROW(fbuf.set_item<float>(2, 0.f), std::out_of_range);
+  EXPECT_THROW(fbuf.set_item_typed<float>(2, 0.f), std::out_of_range);
 
   Buffer ibuf(1, "int32");
-  ibuf.set_item<int32_t>(0, 42);
+  ibuf.set_item_typed<int32_t>(0, 42);
   auto item = ibuf.get_item(0);
   EXPECT_EQ(py::cast<int32_t>(item), 42);
 }
@@ -1074,24 +1074,24 @@ TEST(BufferMembersTest, CastBetweenTypes) {
 TEST(BufferTest, SetItemOutOfBounds) {
   py::scoped_interpreter guard{};
   Buffer buf(1, "float32");
-  EXPECT_THROW(buf.set_item(3, 1.0), std::out_of_range);
+  EXPECT_THROW(buf.set_item_typed<float>(3, 1.0f), std::out_of_range);
 }
 
 TEST(BufferTest, TypeConversions) {
   py::scoped_interpreter guard{};
 
   Buffer dbuf(1, "float64");
-  dbuf.set_item(0, 3.14159);
+  dbuf.set_item_typed<double>(0, 3.14159);
   EXPECT_NEAR(py::cast<double>(dbuf.get_item(0)), 3.14159, 1e-9);
 
   Buffer ibuf(1, "int64");
-  ibuf.set_item(0, -5);
+  ibuf.set_item_typed<int64_t>(0, -5);
   EXPECT_EQ(py::cast<int64_t>(ibuf.get_item(0)), -5);
 
   Buffer fbuf(1, "float32");
-  fbuf.set_item(0, 42);
+  fbuf.set_item_typed<float>(0, 42);
   EXPECT_NEAR(py::cast<float>(fbuf.get_item(0)), 42.0f, 1e-6f);
 
-  fbuf.set_item(0, 5.5);
+  fbuf.set_item_typed<float>(0, 5.5f);
   EXPECT_NEAR(py::cast<float>(fbuf.get_item(0)), 5.5f, 1e-6f);
 }

@@ -35,9 +35,9 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
             "/usr/local/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING
             "Vcpkg toolchain file")
     elseif(APPLE AND EXISTS
-    "/Users/${USER}/vcpkg/scripts/buildsystems/vcpkg.cmake")
+    "$ENV{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake")
         set(CMAKE_TOOLCHAIN_FILE
-            "/Users/${USER}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            "$ENV{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake"
             CACHE STRING "Vcpkg toolchain file")
     endif()
 endif()
@@ -65,18 +65,31 @@ FetchContent_MakeAvailable(pybind11)
 
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
+# Build tests only when explicitly requested.
+option(PYGRAD_BUILD_TESTS "Build pygrad kernel tests" OFF)
+
 # Detect and configure xsimd include directories
 if(DEFINED ENV{XSIMD_INCLUDE_DIR})
     set(XSIMD_INCLUDE_DIR $ENV{XSIMD_INCLUDE_DIR})
 elseif(APPLE)
-    set(XSIMD_INCLUDE_DIR "/Users/${USER}/vcpkg/installed/arm64-osx/include")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        set(XSIMD_INCLUDE_DIR "$ENV{HOME}/vcpkg/installed/arm64-osx/include")
+    else()
+        set(XSIMD_INCLUDE_DIR "$ENV{HOME}/vcpkg/installed/x64-osx/include")
+    endif()
     if(NOT EXISTS "${XSIMD_INCLUDE_DIR}/xsimd/xsimd.hpp")
         set(XSIMD_INCLUDE_DIR "/opt/homebrew/include")
+    endif()
+    if(NOT EXISTS "${XSIMD_INCLUDE_DIR}/xsimd/xsimd.hpp")
+        set(XSIMD_INCLUDE_DIR "/usr/local/include")
     endif()
 elseif(WIN32)
     set(XSIMD_INCLUDE_DIR "C:/vcpkg/installed/x64-windows/include")
 else()
     set(XSIMD_INCLUDE_DIR "/usr/local/vcpkg/installed/x64-linux/include")
+    if(NOT EXISTS "${XSIMD_INCLUDE_DIR}/xsimd/xsimd.hpp")
+        set(XSIMD_INCLUDE_DIR "$ENV{HOME}/vcpkg/installed/x64-linux/include")
+    endif()
     if(NOT EXISTS "${XSIMD_INCLUDE_DIR}/xsimd/xsimd.hpp")
         set(XSIMD_INCLUDE_DIR "/usr/include")
     endif()
@@ -109,13 +122,15 @@ target_include_directories(cpu_kernel PRIVATE
     ${XSIMD_INCLUDE_DIR}
 )
 
-# Fetch GoogleTest
-FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-)
-FetchContent_MakeAvailable(googletest)
+if(PYGRAD_BUILD_TESTS)
+    # Fetch GoogleTest
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+    )
+    FetchContent_MakeAvailable(googletest)
 
-# Enable testing
-enable_testing()
-add_subdirectory(tests/kernels)
+    # Enable testing
+    enable_testing()
+    add_subdirectory(tests/kernels)
+endif()

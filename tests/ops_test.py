@@ -3,7 +3,7 @@ import pytest
 
 from grad.tensor import Tensor
 
-requires_broadcasting_support = pytest.mark.skip(reason="scalar indexing not working yet")
+requires_broadcasting_support = pytest.mark.skip(reason="Broadcasting not supported yet!")
 
 
 class TestAddition:
@@ -262,12 +262,14 @@ class TestPower:
         expected = np.array([4, -27])
         np.testing.assert_array_equal(out.to_numpy(), expected)
 
+    @requires_broadcasting_support
     def test_pow_negative_exponent(self):
         t = Tensor([2, 4, 8])
         result = t**-1
         expected = np.array([0.5, 0.25, 0.125])
         np.testing.assert_array_almost_equal(result.to_numpy(), expected, decimal=6)
 
+    @requires_broadcasting_support
     def test_pow_float_exponent(self):
         t = Tensor([4, 9, 16])
         result = t**0.5

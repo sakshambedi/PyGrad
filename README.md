@@ -40,7 +40,7 @@ The library features a Python frontend with a high-performance C++ backend using
 git clone https://github.com/sakshambedi/micrograd.git
 cd micrograd
 
-make setup-env  # Install dependencies (CMake, Eigen, xsimd)
+make setup-env  # Install prerequisites (including xsimd headers)
 make build      # Build C++ extensions
 make install    # Install Python package
 ```
@@ -105,15 +105,17 @@ print(f"Shape: {result.shape}, dtype: {result.dtype.name}")
 
 ### Prerequisites
 
-| Dependency   | Version   | Purpose                |
-| ------------ | --------- | ---------------------- |
-| Python       | >= 3.7    | Runtime                |
-| NumPy        | >= 1.21.6 | Array interoperability |
-| CMake        | >= 3.14   | Build system           |
-| C++ Compiler | C++17     | Native extensions      |
-| pybind11     | >= 2.11   | Python/C++ bindings    |
+| Dependency   | Version     | Purpose                |
+| ------------ | ----------- | ---------------------- |
+| Python       | >= 3.7      | Runtime                |
+| NumPy        | >= 1.21.6   | Array interoperability |
+| CMake        | >= 3.14     | Build system           |
+| C++ Compiler | C++17       | Native extensions      |
+| pybind11     | >= 2.11     | Python/C++ bindings    |
+| xsimd        | header-only | SIMD acceleration      |
 
-Eigen and xsimd are fetched automatically during build.
+Eigen is fetched automatically during build.
+xsimd must be available as headers on your system (recommended: run `make setup-env`, which installs it via vcpkg).
 
 ### Platform-Specific Setup
 
@@ -163,9 +165,9 @@ python build.py
 | Command          | Description                 |
 | ---------------- | --------------------------- |
 | `make setup-env` | Install all prerequisites   |
-| `make build`     | Release build               |
+| `make build`     | Release build (no tests)    |
 | `make debug`     | Debug build with symbols    |
-| `make test`      | Run C++ and Python tests    |
+| `make test`      | Build and run C++ tests     |
 | `make install`   | Install Python package      |
 | `make clean`     | Remove build artifacts      |
 | `make help`      | Show all available commands |
@@ -328,11 +330,14 @@ The C++ backend uses xsimd for portable SIMD operations:
 ### Running Tests
 
 ```bash
-# All tests
+# Build and run C++ tests
 make test
 
-# Python tests only
+# Run Python tests
 pytest -v
+
+# Run both C++ and Python tests
+make test && pytest -v
 
 # Specific test file
 pytest tests/tensor_test.py -v

@@ -12,7 +12,7 @@ endif
 
 # Variables
 BUILD_DIR := build
-PYTHON := python
+PYTHON := python3
 CMAKE := cmake
 MAKE := make
 
@@ -54,26 +54,34 @@ help:
 build: ## Build the project in Release mode
 	@echo "Building in Release mode..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -Wno-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release -DPYGRAD_BUILD_TESTS=OFF -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -Wno-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 	@cd $(BUILD_DIR) && $(CMAKE_BUILD) $(CMAKE_CONFIG)
 	@echo "Build completed successfully!"
 
 debug: ## Build the project in Debug mode
 	@echo "Building in Debug mode..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3)  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug -DPYGRAD_BUILD_TESTS=OFF -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3)  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 	@cd $(BUILD_DIR) && $(CMAKE_BUILD)
 	@echo "Debug build completed successfully!"
 
 release: build
 
 # Test targets
-test: build
+test: ## Build and run tests in Release mode
+	@echo "Building tests in Release mode..."
+	@mkdir -p $(BUILD_DIR)
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Release -DPYGRAD_BUILD_TESTS=ON -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -Wno-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE_BUILD) $(CMAKE_CONFIG)
 	@echo "Running tests..."
 	@cd $(BUILD_DIR) && (ctest --output-on-failure || $(CMAKE) --build . --target test || echo "Warning: Some tests may have failed")
 	@echo "Tests completed!"
 
-test-debug: debug ## Build in debug mode and run tests
+test-debug: ## Build and run tests in Debug mode
+	@echo "Building tests in Debug mode..."
+	@mkdir -p $(BUILD_DIR)
+	@cd $(BUILD_DIR) && $(CMAKE) -DCMAKE_BUILD_TYPE=Debug -DPYGRAD_BUILD_TESTS=ON -DPython3_EXECUTABLE=$(shell which $(PYTHON) 2>/dev/null || echo python3) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+	@cd $(BUILD_DIR) && $(CMAKE_BUILD)
 	@echo "Running tests (debug build)..."
 	@cd $(BUILD_DIR) && (ctest --output-on-failure || $(CMAKE) --build . --target test || echo "Warning: Some tests may have failed")
 	@echo "Tests completed!"
@@ -106,7 +114,11 @@ install: build ## Install the Python module
 	@find $(BUILD_DIR) -name "cpu_kernel*.$(SO_EXT)" | xargs -I{} cp {} grad/kernels/ 2>/dev/null || \
 	find $(BUILD_DIR) -name "cpu_kernel*.*" | grep -E '\.so|\.dylib|\.dll' | xargs -I{} cp {} grad/kernels/ 2>/dev/null || \
 	echo "Warning: Could not find module file to copy"
-	@$(PYTHON) -m pip install -e .
+	@if command -v uv >/dev/null 2>&1; then \
+		uv pip install -e .; \
+	else \
+		$(PYTHON) -m pip install -e .; \
+	fi
 	@echo "Installation completed!"
 
 uninstall: ## Uninstall the Python module

@@ -33,7 +33,13 @@ install_vcpkg() {
     elif [[ "$OS" == "Darwin" ]]; then
         "$vcpkg_dir/vcpkg" install xsimd:arm64-osx
     else
-        "$vcpkg_dir/vcpkg" install xsimd:x64-linux
+        local arch
+        arch="$(uname -m)"
+        if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+            "$vcpkg_dir/vcpkg" install xsimd:arm64-linux
+        else
+            "$vcpkg_dir/vcpkg" install xsimd:x64-linux
+        fi
     fi
 }
 
@@ -116,7 +122,12 @@ elif [[ "$OS" == "Linux" ]]; then
 
     # Set environment variables
     echo "export VCPKG_ROOT=$VCPKG_DIR" >> ~/.bashrc
-    echo "export XSIMD_INCLUDE_DIR=$VCPKG_DIR/installed/x64-linux/include" >> ~/.bashrc
+    arch="$(uname -m)"
+    if [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+        echo "export XSIMD_INCLUDE_DIR=$VCPKG_DIR/installed/arm64-linux/include" >> ~/.bashrc
+    else
+        echo "export XSIMD_INCLUDE_DIR=$VCPKG_DIR/installed/x64-linux/include" >> ~/.bashrc
+    fi
     echo "export EIGEN3_INCLUDE_DIR=/usr/include/eigen3" >> ~/.bashrc
 
 elif [[ "$OS" == "Windows_NT" ]]; then
