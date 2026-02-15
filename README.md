@@ -1,8 +1,8 @@
 # pygrad
 
-<p align="center">
+<!--<p align="center">
   <img src="./imgs/micrograd-banner-m.jpeg" alt="pygrad" width="600"/>
-</p>
+</p>-->
 
 <p align="center">
   <strong>An Educational Deep Learning Framework with High-Performance C++ Backend</strong>
