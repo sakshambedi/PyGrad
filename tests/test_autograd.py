@@ -35,7 +35,7 @@ def test_div_backward_handles_zero_denominator():
     ctx = DummyContext(1.0, 0.0)
     grad_a, grad_b = Div.backward(ctx, 1.0)
     assert math.isinf(grad_a)
-    assert math.isinf(grad_b)
+    assert abs(grad_b) == math.inf
 
 
 def test_pow_backward_matches_finite_difference():
