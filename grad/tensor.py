@@ -162,6 +162,13 @@ class Tensor:
 
         return self._create_view(tuple(new_shape), stride=tuple(new_stride))
 
+    def item(self) -> T:
+        if (tshape := self.shape) == ():
+            return self.storage[0]
+        raise IndexError(
+            f"Unable to return item from a Tensor of shape {tshape}. Supports tensors with shape ()"
+        )
+
     def view(self, *shape: int) -> Tensor:
         """Return a tensor with the same data but a different shape."""
         shape_tuple = shape[0] if len(shape) == 1 and isinstance(shape[0], tuple) else shape
@@ -277,14 +284,14 @@ class Tensor:
         # dim: Optional[int] = None, # TODO: ADD functionality
         # keepdim: bool = False,
         *,
-        dtype: Optional[DType] = None,
+        dtype: DType | None = None,
     ) -> Tensor:
         if not t.storage:
             raise AttributeError("")
 
         return Tensor(
             sum(Tensor.iterbuffer(t, dtype if dtype else t.dtype)),
-            dtype=t.dtype,
+            dtype=dtype if dtype else t.dtype,
             requires_grad=t.requires_grad,
         )
 

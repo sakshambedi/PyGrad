@@ -1,12 +1,8 @@
 import numpy as np
 import pytest
 
-from grad.dtype import dtypes
-from grad.tensor import Tensor
+from grad import Tensor, dtypes
 
-# Mark tests that require unimplemented features
-requires_working_scalar = pytest.mark.skip(reason="scalar indexing not working yet")
-requires_working_sum = pytest.mark.skip(reason="Sum operation over the Tensor not implemeted yet")
 requires_working_transpose = pytest.mark.skip(
     reason="transpose functionality not fully implemented yet"
 )
@@ -17,25 +13,21 @@ requires_view_ops = pytest.mark.skip(reason="operations on views not fully imple
 
 
 class TestTensorCreation:
-    @requires_working_scalar
     def test_tensor_init_empty(self):
         t = Tensor()
         assert t.shape == ()
         assert t.dtype == dtypes.float32
         assert t.storage is not None
-        assert t[0] == 0
+        assert t.item() == 0
 
-    @requires_working_scalar
     def test_tensor_init_scalar(self):
         t = Tensor(5)
         assert t.shape == ()
-        # Skip accessing scalar values for now
-        # assert t[0] == 5
+        assert t.item() == 5
 
         t = Tensor(3.14)
         assert t.shape == ()
-        # Skip accessing scalar values for now
-        # assert abs(t[0] - 3.14) < 1e-6
+        assert abs(t.item() - 3.14) < 1e-6
 
     def test_tensor_init_list_1d(self):
         data = [1, 2, 3, 4]
@@ -502,7 +494,6 @@ class TestTensorBufferMethods:
 
 
 class TestTensorSumMethod:
-    @requires_working_sum
     def test_sum(self):
         """Test the sum static method."""
 
