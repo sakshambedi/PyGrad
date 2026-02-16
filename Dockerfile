@@ -7,6 +7,9 @@ RUN apt-get update && \
     sudo \
     bash \
     curl \
+    zip \
+    unzip \
+    tar \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -15,8 +18,8 @@ WORKDIR /app
 COPY . /app
 
 # Ensure the prerequisite installer is executable and run it
-RUN chmod +x setup_prerequisite.sh && \
-    ./setup_prerequisite.sh
+RUN chmod +x /app/scripts/setup_prerequisite.sh && \
+    /app/scripts/setup_prerequisite.sh
 
 # Expose vcpkg and include paths for downstream builds
 ENV VCPKG_ROOT=/usr/local/vcpkg \

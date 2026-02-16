@@ -16,18 +16,33 @@ def _elementwise_operation(ctx, a: Tensor, b: Tensor, op_type: operations.Binary
     if a.storage is None or b.storage is None:
         raise ValueError(f"Cannot perform {op_type} on tensors with no storage")
 
-    ctx.save_for_backward(a, b)
     rdtype = dtypes._upcast(a.dtype, b.dtype)
-    out_shape = broadcast_shape(a.shape, b.shape)
-    # cpp_result_buffer = operations.buffer_add(a.storage._storage, b.storage._storage, rdtype.name)
+    out_shape = tuple(broadcast_shape(a.shape, b.shape))
+
+    # Materialize scalar/broadcasted inputs so backend binary op receives same-sized buffers.
+    if tuple(a.shape) == ():
+        a_in = Tensor.full(out_shape, a.item(), dtype=rdtype)
+    else:
+        a_in = a if tuple(a.shape) == out_shape else Tensor._contiguous_tensor(a.expand(*out_shape))
+
+    if tuple(b.shape) == ():
+        b_in = Tensor.full(out_shape, b.item(), dtype=rdtype)
+    else:
+        b_in = b if tuple(b.shape) == out_shape else Tensor._contiguous_tensor(b.expand(*out_shape))
+
+    ctx.save_for_backward(a, b)
+    ctx.a_shape = tuple(a.shape)
+    ctx.b_shape = tuple(b.shape)
+    ctx.out_shape = out_shape
+
     cpp_result_buffer = operations.binary_op(
-        a.storage._storage, b.storage._storage, op_type, rdtype.name
+        a_in.storage._storage, b_in.storage._storage, op_type, rdtype.name
     )
     result = Tensor.__new__(Tensor)
-    result.shape = tuple(out_shape)
+    result.shape = out_shape
     result._stride = tensor_stride(result.shape)
     result.device = (a.device or b.device) or "cpu"
-    result._contiguous = a._contiguous and b._contiguous
+    result._contiguous = True
     result.base_offset = 0
     result.storage = Buffer._from_cpp_buffer(cpp_result_buffer, rdtype)
     result.grad, result.grad_fn, result.requires_grad = None, None, None
@@ -67,9 +82,43 @@ class Add(Function):
         return _elementwise_operation(ctx, a, b, operations.BinaryOpType.ADD)
 
     @staticmethod
-    def backward(ctx: Function, *grad_output: Any) -> Any:
-        # For addition, L = a + b ;  dL/da = grad_output, dL/db = grad_output
-        return grad_output, grad_output
+    def backward(ctx: Function, *grad_outputs: Any) -> Any:
+        # For addition, L = a + b ; dL/da = grad_output, dL/db = grad_output
+        # If inputs were broadcast in forward, reduce gradients back to input shapes.
+        grad_output = grad_outputs[0]
+        a_shape = tuple(getattr(ctx, "a_shape", ()))
+        b_shape = tuple(getattr(ctx, "b_shape", ()))
+
+        def _reduce_to_shape(grad: Tensor, target_shape: tuple[int, ...]) -> Tensor:
+            if tuple(grad.shape) == tuple(target_shape):
+                return grad
+
+            out_shape = tuple(grad.shape)
+            ndiff = len(out_shape) - len(target_shape)
+            padded_target = (1,) * ndiff + tuple(target_shape)
+
+            # Axes to reduce: dimensions introduced by broadcasting or target dim == 1
+            reduce_axes = [
+                i
+                for i, (gdim, tdim) in enumerate(zip(out_shape, padded_target))
+                if tdim == 1 and gdim != 1
+            ]
+
+            reduced = grad
+            for axis in sorted(reduce_axes, reverse=True):
+                reduced = reduced.sum(dim=axis, keepdims=True)
+
+            if ndiff > 0:
+                for _ in range(ndiff):
+                    reduced = reduced.sum(dim=0, keepdims=False)
+
+            if tuple(reduced.shape) != tuple(target_shape):
+                reduced = reduced.reshape(target_shape)
+            return reduced
+
+        grad_a = _reduce_to_shape(grad_output, a_shape)
+        grad_b = _reduce_to_shape(grad_output, b_shape)
+        return grad_a, grad_b
 
 
 class Sub(Function):
