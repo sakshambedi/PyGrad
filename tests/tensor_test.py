@@ -100,10 +100,11 @@ class TestTensorCreation:
         assert t.shape == (5,)
         assert list(t.buffer) == [0, 1, 2, 3, 4]
 
-        # Skip multi-parameter arange tests for now as they're not fully implemented
-        # t = Tensor.arange(10, 15)
-        # assert t.shape == (5,)
-        # assert list(t.buffer) == [10, 11, 12, 13, 14]
+        @pytest.mark.skip(reason="arange with start parameter not yet implemented")
+        def test_arange_with_start():
+            t = Tensor.arange(10, 15)
+            assert t.shape == (5,)
+            assert list(t.buffer) == [10, 11, 12, 13, 14]
 
         # Test with custom dtype
         t = Tensor.arange(5, dtype=dtypes.int32)
@@ -376,6 +377,9 @@ class TestTensorUtilities:
         assert arr.shape == (2, 2)
         np.testing.assert_array_equal(arr, np.array([[1, 2], [3, 4]]))
 
+        t_transposed = Tensor([[1, 2, 3], [4, 5, 6]]).transpose(0, 1)
+        np.testing.assert_array_equal(t_transposed.to_numpy(), np.array([[1, 4], [2, 5], [3, 6]]))
+
     def test_str_repr(self):
         t = Tensor([1, 2, 3])
         assert "1" in str(t) and "2" in str(t) and "3" in str(t)
@@ -555,6 +559,4 @@ class TestTensorSumMethod:
         np.testing.assert_array_equal(row_sum_keep.to_numpy(), np.array([[6], [15]]))
 
         col_sum_class_call = Tensor.sum(t, dim=-2)
-        np.testing.assert_array_equal(
-            col_sum_class_call.to_numpy(), np.array([5, 7, 9])
-        )
+        np.testing.assert_array_equal(col_sum_class_call.to_numpy(), np.array([5, 7, 9]))

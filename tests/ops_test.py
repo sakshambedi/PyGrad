@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from grad.autograd.ops import Add
+from grad.autograd.ops import Add, Div, Mul, Pow, Sub
 from grad.tensor import Tensor
 
 
@@ -131,6 +131,20 @@ class TestSubtraction:
         result = t1 - t2
         assert result.requires_grad is True
 
+    def test_sub_backward_broadcast_reduces_to_input_shapes(self):
+        ctx = Sub()
+        a = Tensor.ones((2, 3))
+        b = Tensor.arange(3)
+
+        out = Sub.forward(ctx, a, b)
+        grad_output = Tensor.ones(out.shape)
+        grad_a, grad_b = Sub.backward(ctx, grad_output)
+
+        assert grad_a.shape == (2, 3)
+        assert grad_b.shape == (3,)
+        np.testing.assert_array_equal(grad_a.to_numpy(), np.ones((2, 3)))
+        np.testing.assert_array_equal(grad_b.to_numpy(), np.full((3,), -2.0))
+
 
 class TestMultiplication:
     @pytest.mark.parametrize(
@@ -184,6 +198,20 @@ class TestMultiplication:
         result = t1 * t2
         assert result.requires_grad is True
 
+    def test_mul_backward_broadcast_reduces_to_input_shapes(self):
+        ctx = Mul()
+        a = Tensor([[2.0], [3.0]])
+        b = Tensor([4.0, 5.0, 6.0])
+
+        out = Mul.forward(ctx, a, b)
+        grad_output = Tensor.ones(out.shape)
+        grad_a, grad_b = Mul.backward(ctx, grad_output)
+
+        assert grad_a.shape == (2, 1)
+        assert grad_b.shape == (3,)
+        np.testing.assert_array_equal(grad_a.to_numpy(), np.array([[15.0], [15.0]]))
+        np.testing.assert_array_equal(grad_b.to_numpy(), np.array([5.0, 5.0, 5.0]))
+
 
 class TestDivision:
     @pytest.mark.parametrize(
@@ -235,6 +263,20 @@ class TestDivision:
         t2 = Tensor([2, 5, 6])
         result = t1 / t2
         assert result.requires_grad is True
+
+    def test_div_backward_broadcast_reduces_to_input_shapes(self):
+        ctx = Div()
+        a = Tensor([[8.0], [12.0]])
+        b = Tensor([2.0, 4.0])
+
+        out = Div.forward(ctx, a, b)
+        grad_output = Tensor.ones(out.shape)
+        grad_a, grad_b = Div.backward(ctx, grad_output)
+
+        assert grad_a.shape == (2, 1)
+        assert grad_b.shape == (2,)
+        np.testing.assert_array_almost_equal(grad_a.to_numpy(), np.array([[0.75], [0.75]]))
+        np.testing.assert_array_almost_equal(grad_b.to_numpy(), np.array([-5.0, -1.25]))
 
 
 class TestPower:
@@ -303,6 +345,27 @@ class TestPower:
         t2 = Tensor([3, 2])
         result = t1**t2
         assert result.requires_grad is True
+
+    def test_pow_backward_broadcast_reduces_to_input_shapes(self):
+        ctx = Pow()
+        a = Tensor([[2.0, 2.0, 2.0], [3.0, 3.0, 3.0]])
+        b = Tensor([2.0, 2.0, 2.0])
+
+        out = Pow.forward(ctx, a, b)
+        grad_output = Tensor.ones(out.shape)
+        grad_a, grad_b = Pow.backward(ctx, grad_output)
+
+        assert grad_a.shape == (2, 3)
+        assert grad_b.shape == (3,)
+        np.testing.assert_array_equal(
+            grad_a.to_numpy(),
+            np.array([[4.0, 4.0, 4.0], [6.0, 6.0, 6.0]]),
+        )
+        expected_grad_b = np.full(
+            (3,),
+            4.0 * np.log(2.0) + 9.0 * np.log(3.0),
+        )
+        np.testing.assert_allclose(grad_b.to_numpy(), expected_grad_b, rtol=1e-6, atol=1e-6)
 
     # @requires_broadcasting_support
     def test_pow_shape_mismatch(self):

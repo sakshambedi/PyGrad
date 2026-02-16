@@ -174,9 +174,7 @@ class Tensor:
 
     def view(self, *shape: int) -> Tensor:
         """Return a tensor with the same data but a different shape."""
-        shape_tuple = (
-            shape[0] if len(shape) == 1 and isinstance(shape[0], tuple) else shape
-        )
+        shape_tuple = shape[0] if len(shape) == 1 and isinstance(shape[0], tuple) else shape
         new_size, old_size = _prod(shape_tuple), _prod(self.shape)
 
         if new_size != old_size:
@@ -254,9 +252,7 @@ class Tensor:
         if t.storage is None:
             raise AttributeError("Tensor with data is not initialized yet!")
 
-        for i in (
-            t.buffer if t.is_contigous() else (t[idx] for idx in _nd_indices(t.shape))
-        ):
+        for i in t.buffer if t.is_contigous() else (t[idx] for idx in _nd_indices(t.shape)):
             yield i
 
     @property
@@ -412,8 +408,13 @@ class Tensor:
         if self.storage is None:
             raise AttributeError("Tensor with data is not initialized yet!")
 
-        arr = np.array(self.storage.to_list(), dtype=self.dtype.fmt)
-        return arr.reshape(self.shape)
+        if self._contiguous:
+            arr = np.array(self.storage.to_list(), dtype=self.dtype.fmt)
+            return arr.reshape(self.shape)
+
+        # Respect view strides for non-contiguous tensors (e.g. transpose/expand).
+        flat = [self[idx] for idx in _nd_indices(self.shape)]
+        return np.array(flat, dtype=self.dtype.fmt).reshape(self.shape)
 
     def __setitem__(self, idx, value):
         """Standard function for setting values by indexing"""
@@ -431,9 +432,7 @@ class Tensor:
         norm = []
         for axis, (i, dim) in enumerate(zip(idx, self.shape)):
             if not isinstance(i, int):
-                raise TypeError(
-                    f"indices must be integers, got {type(i).__name__} at axis {axis}"
-                )
+                raise TypeError(f"indices must be integers, got {type(i).__name__} at axis {axis}")
             if i < 0:
                 i += dim
             if i >= dim or i < 0:
@@ -530,9 +529,7 @@ class Tensor:
         if t._contiguous:
             return t
 
-        out = Tensor.zeros(
-            t.shape, dtype=t.dtype, device=t.device, requires_grad=t.requires_grad
-        )
+        out = Tensor.zeros(t.shape, dtype=t.dtype, device=t.device, requires_grad=t.requires_grad)
         for idx in _nd_indices(t.shape):
             out[idx] = t[idx]
 

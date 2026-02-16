@@ -2,14 +2,8 @@ import math
 
 import pytest
 
+from grad.autograd.ops import Div, Mul, Neg, Pow
 from tests.gradient_check import finite_difference_grads
-
-try:
-    from grad.autograd.ops import Div, Mul, Neg, Pow
-except ImportError:  # pragma: no cover - depends on compiled extension availability
-    Div = Mul = Neg = Pow = None
-
-pytestmark = pytest.mark.skipif(Div is None, reason="autograd ops extension is unavailable")
 
 
 class DummyContext:

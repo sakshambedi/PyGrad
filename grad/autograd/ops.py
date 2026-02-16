@@ -4,7 +4,8 @@ import math
 from typing import Any
 
 import numpy as np
-from grad.autograd import operations  # type:ignore
+
+from grad.autograd import operations
 from grad.autograd.function import Function
 from grad.buffer import Buffer
 from grad.dtype import dtypes
@@ -75,6 +76,55 @@ def _safe_divide(numerator: Any, denominator: Any) -> Any:
     return numerator / denominator
 
 
+def _reduce_to_shape(grad: Tensor, target_shape: tuple[int, ...]) -> Tensor:
+    if tuple(grad.shape) == tuple(target_shape):
+        return grad
+
+    out_shape = tuple(grad.shape)
+    ndiff = len(out_shape) - len(target_shape)
+    padded_target = (1,) * ndiff + tuple(target_shape)
+
+    # Axes to reduce: dimensions introduced by broadcasting or target dim == 1
+    reduce_axes = [
+        i for i, (gdim, tdim) in enumerate(zip(out_shape, padded_target)) if tdim == 1 and gdim != 1
+    ]
+
+    reduced = grad
+    for axis in sorted(reduce_axes, reverse=True):
+        reduced = reduced.sum(dim=axis, keepdims=True)
+
+    if ndiff > 0:
+        for _ in range(ndiff):
+            reduced = reduced.sum(dim=0, keepdims=False)
+
+    if tuple(reduced.shape) != tuple(target_shape):
+        reduced = reduced.reshape(target_shape)
+    return reduced
+
+
+def _target_shape(
+    ctx: Function, saved: Any, shape_attr: str, fallback: tuple[int, ...]
+) -> tuple[int, ...]:
+    if hasattr(ctx, shape_attr):
+        return tuple(getattr(ctx, shape_attr))
+    if isinstance(saved, Tensor):
+        return tuple(saved.shape)
+    return fallback
+
+
+def _materialize_operand(operand: Any, out_shape: tuple[int, ...], ref: Tensor) -> Tensor:
+    if isinstance(operand, Tensor):
+        if tuple(operand.shape) == out_shape:
+            return operand
+        if tuple(operand.shape) == ():
+            return Tensor.full(
+                out_shape, operand.item(), dtype=operand.dtype, device=operand.device or "cpu"
+            )
+        return Tensor._contiguous_tensor(operand.expand(*out_shape))
+
+    return Tensor.full(out_shape, operand, dtype=ref.dtype, device=ref.device or "cpu")
+
+
 class Add(Function):
     @staticmethod
     def forward(ctx: Function, a: Tensor, b: Tensor) -> Tensor:
@@ -86,35 +136,16 @@ class Add(Function):
         # For addition, L = a + b ; dL/da = grad_output, dL/db = grad_output
         # If inputs were broadcast in forward, reduce gradients back to input shapes.
         grad_output = grad_outputs[0]
+        if not isinstance(grad_output, Tensor):
+            return grad_output, grad_output
+
+        a, b = ctx.saved_tensor
         a_shape = tuple(getattr(ctx, "a_shape", ()))
         b_shape = tuple(getattr(ctx, "b_shape", ()))
-
-        def _reduce_to_shape(grad: Tensor, target_shape: tuple[int, ...]) -> Tensor:
-            if tuple(grad.shape) == tuple(target_shape):
-                return grad
-
-            out_shape = tuple(grad.shape)
-            ndiff = len(out_shape) - len(target_shape)
-            padded_target = (1,) * ndiff + tuple(target_shape)
-
-            # Axes to reduce: dimensions introduced by broadcasting or target dim == 1
-            reduce_axes = [
-                i
-                for i, (gdim, tdim) in enumerate(zip(out_shape, padded_target))
-                if tdim == 1 and gdim != 1
-            ]
-
-            reduced = grad
-            for axis in sorted(reduce_axes, reverse=True):
-                reduced = reduced.sum(dim=axis, keepdims=True)
-
-            if ndiff > 0:
-                for _ in range(ndiff):
-                    reduced = reduced.sum(dim=0, keepdims=False)
-
-            if tuple(reduced.shape) != tuple(target_shape):
-                reduced = reduced.reshape(target_shape)
-            return reduced
+        if not a_shape:
+            a_shape = _target_shape(ctx, a, "a_shape", tuple(grad_output.shape))
+        if not b_shape:
+            b_shape = _target_shape(ctx, b, "b_shape", tuple(grad_output.shape))
 
         grad_a = _reduce_to_shape(grad_output, a_shape)
         grad_b = _reduce_to_shape(grad_output, b_shape)
@@ -131,7 +162,16 @@ class Sub(Function):
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
         # For subtraction, L = a - b; dL/da = grad_output, dL/db = -grad_output
         grad_output = grad_outputs[0]
-        return grad_output, -grad_output
+        if not isinstance(grad_output, Tensor):
+            return grad_output, -grad_output
+
+        a, b = ctx.saved_tensor
+        a_shape = _target_shape(ctx, a, "a_shape", tuple(grad_output.shape))
+        b_shape = _target_shape(ctx, b, "b_shape", tuple(grad_output.shape))
+
+        grad_a = _reduce_to_shape(grad_output, a_shape)
+        grad_b = _reduce_to_shape(-grad_output, b_shape)
+        return grad_a, grad_b
 
 
 class Mul(Function):
@@ -144,7 +184,21 @@ class Mul(Function):
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
         grad_output = grad_outputs[0]
         a, b = ctx.saved_tensor
-        return b * grad_output, a * grad_output
+        if not isinstance(grad_output, Tensor):
+            return b * grad_output, a * grad_output
+
+        out_shape = tuple(getattr(ctx, "out_shape", tuple(grad_output.shape)))
+        a_in = _materialize_operand(a, out_shape, grad_output)
+        b_in = _materialize_operand(b, out_shape, grad_output)
+
+        grad_a_full = b_in * grad_output
+        grad_b_full = a_in * grad_output
+
+        a_shape = _target_shape(ctx, a, "a_shape", tuple(grad_output.shape))
+        b_shape = _target_shape(ctx, b, "b_shape", tuple(grad_output.shape))
+        grad_a = _reduce_to_shape(grad_a_full, a_shape)
+        grad_b = _reduce_to_shape(grad_b_full, b_shape)
+        return grad_a, grad_b
 
 
 class Div(Function):
@@ -157,8 +211,22 @@ class Div(Function):
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
         grad_output = grad_outputs[0]
         a, b = ctx.saved_tensor
-        grad_a = _safe_divide(grad_output, b)
-        grad_b = -_safe_divide(a * grad_output, b**2)
+        if not isinstance(grad_output, Tensor):
+            grad_a = _safe_divide(grad_output, b)
+            grad_b = -_safe_divide(a * grad_output, b**2)
+            return grad_a, grad_b
+
+        out_shape = tuple(getattr(ctx, "out_shape", tuple(grad_output.shape)))
+        a_in = _materialize_operand(a, out_shape, grad_output)
+        b_in = _materialize_operand(b, out_shape, grad_output)
+
+        grad_a_full = grad_output / b_in
+        grad_b_full = -(a_in * grad_output / (b_in**2))
+
+        a_shape = _target_shape(ctx, a, "a_shape", tuple(grad_output.shape))
+        b_shape = _target_shape(ctx, b, "b_shape", tuple(grad_output.shape))
+        grad_a = _reduce_to_shape(grad_a_full, a_shape)
+        grad_b = _reduce_to_shape(grad_b_full, b_shape)
         return grad_a, grad_b
 
 
@@ -172,12 +240,25 @@ class Pow(Function):
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
         grad_output = grad_outputs[0]
         a, b = ctx.saved_tensor
-        grad_a = b * (a ** (b - 1)) * grad_output
-        if isinstance(a, Tensor):
-            ln_a = Tensor(np.log(a.to_numpy()).tolist(), dtype=a.dtype, device=a.device)
-        else:
-            ln_a = math.log(a)
-        grad_b = (a**b) * ln_a * grad_output
+
+        if not isinstance(grad_output, Tensor):
+            grad_a = b * (a ** (b - 1)) * grad_output
+            ln_a = math.log(a) if not isinstance(a, Tensor) else math.log(float(a.item()))
+            grad_b = (a**b) * ln_a * grad_output
+            return grad_a, grad_b
+
+        out_shape = tuple(getattr(ctx, "out_shape", tuple(grad_output.shape)))
+        a_in = _materialize_operand(a, out_shape, grad_output)
+        b_in = _materialize_operand(b, out_shape, grad_output)
+
+        grad_a_full = b_in * (a_in ** (b_in - 1)) * grad_output
+        ln_a = Tensor(np.log(a_in.to_numpy()).tolist(), dtype=a_in.dtype, device=a_in.device)
+        grad_b_full = (a_in**b_in) * ln_a * grad_output
+
+        a_shape = _target_shape(ctx, a, "a_shape", tuple(grad_output.shape))
+        b_shape = _target_shape(ctx, b, "b_shape", tuple(grad_output.shape))
+        grad_a = _reduce_to_shape(grad_a_full, a_shape)
+        grad_b = _reduce_to_shape(grad_b_full, b_shape)
         return grad_a, grad_b
 
 
