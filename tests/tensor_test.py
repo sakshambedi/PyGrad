@@ -3,8 +3,6 @@ import pytest
 
 from grad import Tensor, dtypes
 
-requires_view_ops = pytest.mark.skip(reason="operations on views not fully implemented yet")
-
 
 class TestTensorCreation:
     def test_tensor_init_empty(self):
@@ -380,12 +378,10 @@ class TestTensorUtilities:
 
     def test_str_repr(self):
         t = Tensor([1, 2, 3])
-        # Be more flexible in string representation testing
         assert "1" in str(t) and "2" in str(t) and "3" in str(t)
         assert "shape=(3,)" in repr(t)
 
         t = Tensor([[1, 2], [3, 4]])
-        # Be more flexible in string representation testing
         assert "1" in str(t) and "2" in str(t) and "3" in str(t) and "4" in str(t)
         assert "shape=(2, 2)" in repr(t)
 

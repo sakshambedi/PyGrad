@@ -1,11 +1,10 @@
+import weakref
 from collections.abc import Iterable
 from typing import Any
 
 from grad.device import Device
 from grad.dtype import DType, DTypeLike, to_dtype
 from grad.kernels import cpu_kernel
-
-__slot__ = ["Buffer"]
 
 
 class Buffer:
@@ -15,11 +14,12 @@ class Buffer:
     It provides methods for creating, accessing, and modifying data buffers.
     """
 
-    __slots__ = ("_dtype", "_storage", "_parent")
+    __slots__ = ("_dtype", "_storage", "_parent", "__weakref__")
 
     def __init__(self, iterable: Iterable[Any], dtype: DTypeLike, *, copy: bool = True):
         self._dtype: DType = to_dtype(dtype)
         self._storage = cpu_kernel.Buffer(iterable, self._dtype.name)
+        self._parent = None
 
     def to(self, device: Device): ...  # noqa: E704
 
@@ -31,7 +31,6 @@ class Buffer:
         return self._storage.size()
 
     def __repr__(self) -> str:
-        # For test compatibility, return a simple string representation of the data
         return str(self.to_list())
 
     def share(self) -> "Buffer":
@@ -40,7 +39,7 @@ class Buffer:
         new_buff._dtype = self._dtype
         new_buff._storage = self._storage
         # Create a weakref to the original buffer for updates
-        new_buff._parent = self
+        new_buff._parent = weakref.ref(self)
         return new_buff
 
     def shares_storage_with(self, other: "Buffer") -> bool:
@@ -78,6 +77,7 @@ class Buffer:
         buff._dtype = out_dtype = to_dtype(dtype)
         # buff._storage = cpu_kernel.Buffer(num_elem, out_dtype.name, val)
         buff._storage = cpu_kernel.Buffer._filled(val, out_dtype.name, num_elem)
+        buff._parent = None
         return buff
 
     def __getitem__(self, idx: int):
@@ -98,4 +98,5 @@ class Buffer:
         buff = cls.__new__(cls)
         buff._dtype = to_dtype(dtype)
         buff._storage = cpp_buffer
+        buff._parent = None
         return buff

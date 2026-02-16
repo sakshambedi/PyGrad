@@ -10,7 +10,7 @@ from grad.buffer import Buffer
 from grad.dtype import DType, DTypeLike, dtypes
 from grad.utils.misc import _nd_indices, tensor_stride
 
-__all__ = ["Tensor", "dtypes"]
+__all__ = ["Tensor"]
 
 
 class Tensor:
@@ -350,7 +350,6 @@ class Tensor:
                 raise TypeError(
                     f"indices must be integers, got {type(idx).__name__} at axis {axis}"
                 )
-            print(f"axis:  index & shape : {axis} : {list(zip(index, self.shape))}")
 
             if idx < 0:
                 idx += dim
