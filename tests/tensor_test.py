@@ -100,10 +100,13 @@ class TestTensorCreation:
         assert t.shape == (5,)
         assert list(t.buffer) == [0, 1, 2, 3, 4]
 
-        # Skip multi-parameter arange tests for now as they're not fully implemented
-        # t = Tensor.arange(10, 15)
-        # assert t.shape == (5,)
-        # assert list(t.buffer) == [10, 11, 12, 13, 14]
+        t = Tensor.arange(15, start=10)
+        assert t.shape == (5,)
+        assert list(t.buffer) == [10, 11, 12, 13, 14]
+
+        t = Tensor.arange(10, start=15, step=-2)
+        assert t.shape == (3,)
+        assert list(t.buffer) == [15, 13, 11]
 
         # Test with custom dtype
         t = Tensor.arange(5, dtype=dtypes.int32)
@@ -244,6 +247,10 @@ class TestTensorShape:
         assert t_perm[0, 0, 1] == 5
         assert t_perm[1, 1, 1] == 8
 
+        t_perm_tuple = Tensor.permute(t, (2, 1, 0))
+        assert t_perm_tuple.shape == (2, 2, 2)
+        assert t_perm_tuple[0, 0, 1] == 5
+
         with pytest.raises(ValueError):
             Tensor.permute(t, 0, 1)
 
@@ -252,6 +259,26 @@ class TestTensorShape:
 
         with pytest.raises(ValueError):
             Tensor.permute(t, 0, 1, 3)
+
+    def test_expand(self):
+        t = Tensor([[1], [2], [3]])
+        expanded = t.expand(3, 4)
+        assert expanded.shape == (3, 4)
+        assert expanded[0, 0] == 1
+        assert expanded[0, 3] == 1
+        assert expanded[2, 1] == 3
+
+        t_1d = Tensor([1, 2, 3])
+        expanded_1d = t_1d.expand(2, 3)
+        assert expanded_1d.shape == (2, 3)
+        assert expanded_1d[0, 0] == 1
+        assert expanded_1d[1, 2] == 3
+
+        with pytest.raises(ValueError):
+            Tensor([1, 2]).expand(3, 3)
+
+        with pytest.raises(ValueError):
+            Tensor([1, 2]).expand(1)
 
 
 class TestTensorAccess:
@@ -267,6 +294,9 @@ class TestTensorAccess:
 
         with pytest.raises(IndexError):
             t[-5]  # Out of bounds
+
+        with pytest.raises(TypeError):
+            _ = t[1.5]
 
     def test_getitem_2d(self):
         t = Tensor([[1, 2, 3], [4, 5, 6]])
@@ -317,6 +347,9 @@ class TestTensorAccess:
 
         with pytest.raises(IndexError):
             t[-5] = 50  # Out of bounds
+
+        with pytest.raises(TypeError):
+            t[1.5] = 10
 
     def test_setitem_2d(self):
         t = Tensor([[1, 2, 3], [4, 5, 6]])
@@ -375,6 +408,19 @@ class TestTensorUtilities:
         assert isinstance(arr, np.ndarray)
         assert arr.shape == (2, 2)
         np.testing.assert_array_equal(arr, np.array([[1, 2], [3, 4]]))
+
+        t_transpose = Tensor([[1, 2, 3], [4, 5, 6]]).transpose(0, 1)
+        np.testing.assert_array_equal(t_transpose.to_numpy(), np.array([[1, 4], [2, 5], [3, 6]]))
+
+        t_expand = Tensor([[1], [2], [3]]).expand(3, 2)
+        np.testing.assert_array_equal(t_expand.to_numpy(), np.array([[1, 1], [2, 2], [3, 3]]))
+
+    def test_item(self):
+        scalar = Tensor(7.0)
+        assert scalar.item() == 7.0
+
+        with pytest.raises(IndexError):
+            Tensor([1, 2, 3]).item()
 
     def test_str_repr(self):
         t = Tensor([1, 2, 3])
@@ -555,6 +601,10 @@ class TestTensorSumMethod:
         np.testing.assert_array_equal(row_sum_keep.to_numpy(), np.array([[6], [15]]))
 
         col_sum_class_call = Tensor.sum(t, dim=-2)
-        np.testing.assert_array_equal(
-            col_sum_class_call.to_numpy(), np.array([5, 7, 9])
-        )
+        np.testing.assert_array_equal(col_sum_class_call.to_numpy(), np.array([5, 7, 9]))
+
+        with pytest.raises(TypeError):
+            _ = t.sum(dim="0")
+
+        with pytest.raises(IndexError):
+            _ = t.sum(dim=2)
