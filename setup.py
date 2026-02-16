@@ -70,10 +70,24 @@ def get_include_dirs():
         dirs.append(os.environ["XSIMD_INCLUDE_DIR"])
     elif sys.platform == "darwin":
         if platform.machine() == "arm64":
-            xsimd_dir = os.path.expanduser("~/vcpkg/installed/arm64-osx/include")
+            xsimd_candidates = [
+                os.path.expanduser("~/vcpkg/installed/arm64-osx/include"),
+                "/opt/homebrew/include",
+                "/usr/local/include",
+            ]
         else:
-            xsimd_dir = os.path.expanduser("~/vcpkg/installed/x64-osx/include")
-        dirs.append(xsimd_dir)
+            xsimd_candidates = [
+                os.path.expanduser("~/vcpkg/installed/x64-osx/include"),
+                "/usr/local/include",
+                "/opt/homebrew/include",
+            ]
+
+        for path in xsimd_candidates:
+            if os.path.exists(os.path.join(path, "xsimd", "xsimd.hpp")):
+                dirs.append(path)
+                break
+        else:
+            dirs.append(xsimd_candidates[0])
     elif sys.platform == "win32":
         dirs.append("C:/vcpkg/installed/x64-windows/include")
     else:  # Linux

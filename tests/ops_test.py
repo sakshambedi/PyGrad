@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from grad.autograd.ops import Add
 from grad.tensor import Tensor
 
 
@@ -70,6 +71,20 @@ class TestAddition:
         t2 = Tensor([4, 5, 6])
         result = t1 + t2
         assert result.requires_grad is True
+
+    def test_add_backward_broadcast_reduces_to_input_shapes(self):
+        ctx = Add()
+        a = Tensor.ones((3, 1))
+        b = Tensor.arange(3)
+
+        out = Add.forward(ctx, a, b)
+        grad_output = Tensor.ones(out.shape)
+        grad_a, grad_b = Add.backward(ctx, grad_output)
+
+        assert grad_a.shape == (3, 1)
+        assert grad_b.shape == (3,)
+        np.testing.assert_array_equal(grad_a.to_numpy(), np.full((3, 1), 3.0))
+        np.testing.assert_array_equal(grad_b.to_numpy(), np.full((3,), 3.0))
 
 
 class TestSubtraction:

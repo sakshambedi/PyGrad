@@ -544,3 +544,17 @@ class TestTensorSumMethod:
         t5.storage = None
         with pytest.raises(AttributeError):
             _ = Tensor.sum(t5)
+
+    def test_sum_dim_and_keepdims(self):
+        t = Tensor([[1, 2, 3], [4, 5, 6]])
+
+        col_sum = t.sum(dim=0)
+        np.testing.assert_array_equal(col_sum.to_numpy(), np.array([5, 7, 9]))
+
+        row_sum_keep = t.sum(dim=1, keepdims=True)
+        np.testing.assert_array_equal(row_sum_keep.to_numpy(), np.array([[6], [15]]))
+
+        col_sum_class_call = Tensor.sum(t, dim=-2)
+        np.testing.assert_array_equal(
+            col_sum_class_call.to_numpy(), np.array([5, 7, 9])
+        )

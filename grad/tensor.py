@@ -162,16 +162,21 @@ class Tensor:
 
         return self._create_view(tuple(new_shape), stride=tuple(new_stride))
 
-    def item(self) -> T:
+    def item(self) -> Any:
         if (tshape := self.shape) == ():
-            return self.storage[0]
+            storage = self.storage
+            if storage is None:
+                raise AttributeError("Tensor with data is not initialized yet!")
+            return storage[0]
         raise IndexError(
             f"Unable to return item from a Tensor of shape {tshape}. Supports tensors with shape ()"
         )
 
     def view(self, *shape: int) -> Tensor:
         """Return a tensor with the same data but a different shape."""
-        shape_tuple = shape[0] if len(shape) == 1 and isinstance(shape[0], tuple) else shape
+        shape_tuple = (
+            shape[0] if len(shape) == 1 and isinstance(shape[0], tuple) else shape
+        )
         new_size, old_size = _prod(shape_tuple), _prod(self.shape)
 
         if new_size != old_size:
@@ -212,7 +217,10 @@ class Tensor:
     @staticmethod
     def permute(ten: Tensor, *idx: int) -> Tensor:
         """Permute the tensor. Read more: https://docs.pytorch.org/docs/stable/generated/torch.permute.html"""
-        idx_tup: tuple[int, ...] = idx[0] if len(idx) == 1 and isinstance(idx[0], tuple) else idx
+        if len(idx) == 1 and isinstance(idx[0], tuple):
+            idx_tup = tuple(int(i) for i in idx[0])
+        else:
+            idx_tup = idx
         if len(idx_tup) != len(ten.shape):
             raise ValueError(
                 f"Number of permutation indices ({len(idx)}) must match tensor dimensions ({len(ten.shape)})"
@@ -225,7 +233,7 @@ class Tensor:
             )
 
         shape_n = [ten.shape[d] for d in idx_tup]
-        stride_n = [ten.stride(d) for d in idx_tup]
+        stride_n = [ten._stride[d] for d in idx_tup]
         return ten._create_view(tuple(shape_n), stride=tuple(stride_n))
 
     @property
@@ -246,7 +254,9 @@ class Tensor:
         if t.storage is None:
             raise AttributeError("Tensor with data is not initialized yet!")
 
-        for i in t.buffer if t.is_contigous() else (t[idx] for idx in _nd_indices(t.shape)):
+        for i in (
+            t.buffer if t.is_contigous() else (t[idx] for idx in _nd_indices(t.shape))
+        ):
             yield i
 
     @property
@@ -272,22 +282,54 @@ class Tensor:
     @staticmethod
     def mean(t: Tensor, /, axis: int = 0) -> Tensor: ...  # noqa
 
-    @staticmethod
     def sum(
-        t: Tensor,
-        # dim: int | None = None, # TODO: ADD functionality
-        # keepdim: bool = False,
+        self,
+        dim: int | None = None,
+        keepdims: bool = False,
         *,
         dtype: DType | None = None,
     ) -> Tensor:
-        if not t.storage:
-            raise AttributeError("")
+        if self.storage is None:
+            raise AttributeError("Tensor with data is not initialized yet!")
 
-        return Tensor(
-            sum(Tensor.iterbuffer(t, dtype if dtype else t.dtype)),
-            dtype=dtype if dtype else t.dtype,
-            requires_grad=t.requires_grad,
+        out_dtype = dtype if dtype is not None else self.dtype
+
+        if dim is None:
+            return Tensor(
+                sum(Tensor.iterbuffer(self, out_dtype)),
+                dtype=out_dtype,
+                requires_grad=self.requires_grad,
+            )
+
+        if not isinstance(dim, int):
+            raise TypeError(f"dim must be int or None, got {type(dim).__name__}")
+
+        ndim = len(self.shape)
+        axis = dim + ndim if dim < 0 else dim
+        if axis < 0 or axis >= ndim:
+            raise IndexError(
+                f"Dimension out of range (expected to be in range of [{-ndim}, {ndim - 1}], but got {dim})"
+            )
+
+        if keepdims:
+            out_shape = list(self.shape)
+            out_shape[axis] = 1
+            out_shape = tuple(out_shape)
+        else:
+            out_shape = self.shape[:axis] + self.shape[axis + 1 :]
+
+        out = Tensor.zeros(
+            out_shape,
+            dtype=out_dtype,
+            device=self.device,
+            requires_grad=self.requires_grad,
         )
+
+        for idx in _nd_indices(self.shape):
+            out_idx = idx[:axis] + ((0,) if keepdims else ()) + idx[axis + 1 :]
+            out[out_idx] = out[out_idx] + self[idx]
+
+        return out
 
     # ---- Default override fuctions ----
     def __add__(self, other):
@@ -334,8 +376,9 @@ class Tensor:
 
     def __getitem__(self, index):
         """Access tensor data by index."""
-        # if self.storage is None:
-        #     raise AttributeError("Tensor with a storage has not been initialized yet!")
+        storage = self.storage
+        if storage is None:
+            raise AttributeError("Tensor with a storage has not been initialized yet!")
         if not isinstance(index, tuple):
             index = (index,)
         if len(index) != len(self.shape):
@@ -360,7 +403,7 @@ class Tensor:
             norm.append(idx)
 
         offsetval = self._offset(tuple(norm))
-        return self.storage[offsetval]
+        return storage[offsetval]
 
     def to_numpy(self):
         """Convert tensor to numpy array."""
@@ -388,7 +431,9 @@ class Tensor:
         norm = []
         for axis, (i, dim) in enumerate(zip(idx, self.shape)):
             if not isinstance(i, int):
-                raise TypeError(f"indices must be integers, got {type(i).__name__} at axis {axis}")
+                raise TypeError(
+                    f"indices must be integers, got {type(i).__name__} at axis {axis}"
+                )
             if i < 0:
                 i += dim
             if i >= dim or i < 0:
@@ -429,7 +474,12 @@ class Tensor:
         inst.shape = tuple(shape)
         inst._stride = tensor_stride(inst.shape)
         inst.device, inst.requires_grad = device, requires_grad
-        inst.grad, inst.grad_fn, inst._contiguous, inst.base_offset = None, None, True, 0
+        inst.grad, inst.grad_fn, inst._contiguous, inst.base_offset = (
+            None,
+            None,
+            True,
+            0,
+        )
         return inst
 
     def _create_view(
@@ -480,7 +530,9 @@ class Tensor:
         if t._contiguous:
             return t
 
-        out = Tensor.zeros(t.shape, dtype=t.dtype, device=t.device, requires_grad=t.requires_grad)
+        out = Tensor.zeros(
+            t.shape, dtype=t.dtype, device=t.device, requires_grad=t.requires_grad
+        )
         for idx in _nd_indices(t.shape):
             out[idx] = t[idx]
 
