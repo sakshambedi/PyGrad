@@ -3,9 +3,9 @@ project(pygrad)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Enable SIMD optimizations while maintaining IEEE 754 compliance
-# Set common flags for both Release and Debug modes to ensure consistent behavior
-set(COMMON_FLAGS "-fno-math-errno -freciprocal-math -fno-fast-math -ffp-contract=on")
+# Enable SIMD optimizations while maintaining IEEE 754 compliance.
+# Set common flags for both Release and Debug modes to ensure consistent behavior.
+set(COMMON_FLAGS "-fno-math-errno -fno-reciprocal-math -fno-fast-math -ffp-contract=on")
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(COMMON_FLAGS "${COMMON_FLAGS} -march=native -mtune=native")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
