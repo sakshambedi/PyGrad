@@ -8,7 +8,9 @@ from setuptools import Extension, find_packages, setup
 extra_compile_args = [
     "-std=c++17" if not sys.platform == "win32" else "/std:c++17",
     "-O3" if not sys.platform == "win32" else "/O2",
-    "-ffast-math" if not sys.platform == "win32" else "/fp:fast",
+    # Keep IEEE-754 behavior (especially for division) across platforms.
+    "-fno-fast-math" if not sys.platform == "win32" else "/fp:precise",
+    "-fno-reciprocal-math" if not sys.platform == "win32" else "/fp:precise",
     "-DEIGEN_MAX_ALIGN_BYTES=64",
     "-DNDEBUG",  # Disable debug assertions for performance
 ]
