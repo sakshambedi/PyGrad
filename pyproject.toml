@@ -8,9 +8,7 @@ version = "0.12.61"
 description = "A minimalistic autograd engine"
 authors = [{ name = "Saksham Bedi", email = "hello@sakshambedi.com" }]
 requires-python = ">=3.8"
-dependencies = [
-    "numpy>=1.21.6",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [

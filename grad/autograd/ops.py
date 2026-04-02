@@ -3,8 +3,6 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import numpy as np
-
 from grad.autograd import operations
 from grad.autograd._functions import (
     _elementwise_operation,
@@ -16,6 +14,16 @@ from grad.autograd._functions import (
 )
 from grad.autograd.function import Function
 from grad.tensor import Tensor
+
+
+def _apply_elementwise(t: Tensor, fn) -> list:
+    """Apply a scalar function element-wise, returning a nested list matching t.shape."""
+    from grad.utils.misc import _nd_indices
+
+    if t.shape == ():
+        return fn(t.item())
+    flat = [fn(t[idx]) for idx in _nd_indices(t.shape)]
+    return Tensor._nest(flat, list(t.shape))
 
 
 class Add(Function):
@@ -145,7 +153,10 @@ class Pow(Function):
         b_in = _materialize_operand(b, out_shape, grad_output)
 
         grad_a_full = b_in * (a_in ** (b_in - 1)) * grad_output
-        ln_a = Tensor(np.log(a_in.to_numpy()).tolist(), dtype=a_in.dtype, device=a_in.device)
+        ln_a = Tensor(
+            _apply_elementwise(a_in, math.log),
+            dtype=a_in.dtype, device=a_in.device,
+        )
         grad_b_full = (a_in**b_in) * ln_a * grad_output
 
         a_shape = _target_shape(ctx, a, "a_shape", tuple(grad_output.shape))
@@ -169,13 +180,97 @@ class Neg(Function):
         return (-grad_output,)
 
 
-class Exp(Function):
+class Sum(Function):
     @staticmethod
-    def forward(ctx: Function, a: Tensor, *, out=None) -> Tensor:
-        """Element-wise negation."""
-        ...
+    def forward(ctx: Function, a: Tensor, *, dim: int | None = None, keepdims: bool = False) -> Tensor:
+        """Sum reduction along a dimension."""
+        from grad.utils.misc import _nd_indices
+
+        ctx.save_for_backward(a)
+        ctx.a_shape = tuple(a.shape)
+        ctx.dim = dim
+        ctx.keepdims = keepdims
+
+        if dim is None:
+            total = sum(a[idx] for idx in _nd_indices(a.shape))
+            return Tensor(total, dtype=a.dtype, device=a.device)
+
+        ndim = len(a.shape)
+        axis = dim + ndim if dim < 0 else dim
+
+        if keepdims:
+            out_shape = a.shape[:axis] + (1,) + a.shape[axis + 1 :]
+        else:
+            out_shape = a.shape[:axis] + a.shape[axis + 1 :]
+
+        out = Tensor.zeros(out_shape, dtype=a.dtype, device=a.device)
+        for idx in _nd_indices(a.shape):
+            out_idx = idx[:axis] + ((0,) if keepdims else ()) + idx[axis + 1 :]
+            out[out_idx] = out[out_idx] + a[idx]
+        return out
 
     @staticmethod
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
-        # implement backward for
-        ...
+        from grad.utils.misc import _nd_indices
+
+        grad_output = grad_outputs[0]
+        a_shape = ctx.a_shape
+
+        if not isinstance(grad_output, Tensor):
+            grad_output = Tensor(grad_output)
+
+        if ctx.dim is None:
+            grad_val = grad_output.item() if grad_output.shape == () else grad_output[(0,)]
+            return (Tensor.full(a_shape, grad_val, dtype=grad_output.dtype),)
+
+        # Broadcast gradient back along the reduced dimension
+        out = Tensor.zeros(a_shape, dtype=grad_output.dtype)
+        ndim = len(a_shape)
+        axis = ctx.dim + ndim if ctx.dim < 0 else ctx.dim
+        for idx in _nd_indices(a_shape):
+            grad_idx = idx[:axis] + ((0,) if ctx.keepdims else ()) + idx[axis + 1 :]
+            out[idx] = grad_output[grad_idx]
+        return (out,)
+
+
+class Exp(Function):
+    @staticmethod
+    def forward(ctx: Function, a: Tensor) -> Tensor:
+        """Element-wise exponential: e^a."""
+        result = Tensor(
+            _apply_elementwise(a, math.exp),
+            dtype=a.dtype, device=a.device,
+        )
+        ctx.save_for_backward(a)
+        ctx.exp_result = result
+        return result
+
+    @staticmethod
+    def backward(ctx: Function, *grad_outputs: Any) -> Any:
+        # d/da e^a = e^a * grad_output
+        grad_output = grad_outputs[0]
+        exp_result = ctx.exp_result
+        if not isinstance(grad_output, Tensor):
+            return (exp_result * grad_output,)
+        return (exp_result * grad_output,)
+
+
+class Log(Function):
+    @staticmethod
+    def forward(ctx: Function, a: Tensor) -> Tensor:
+        """Element-wise natural logarithm: ln(a)."""
+        result = Tensor(
+            _apply_elementwise(a, math.log),
+            dtype=a.dtype, device=a.device,
+        )
+        ctx.save_for_backward(a)
+        return result
+
+    @staticmethod
+    def backward(ctx: Function, *grad_outputs: Any) -> Any:
+        # d/da ln(a) = 1/a * grad_output
+        grad_output = grad_outputs[0]
+        (a,) = ctx.saved_tensor
+        if not isinstance(grad_output, Tensor):
+            return (grad_output / a,)
+        return (grad_output / a,)
