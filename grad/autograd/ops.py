@@ -155,7 +155,8 @@ class Pow(Function):
         grad_a_full = b_in * (a_in ** (b_in - 1)) * grad_output
         ln_a = Tensor(
             _apply_elementwise(a_in, math.log),
-            dtype=a_in.dtype, device=a_in.device,
+            dtype=a_in.dtype,
+            device=a_in.device,
         )
         grad_b_full = (a_in**b_in) * ln_a * grad_output
 
@@ -176,7 +177,6 @@ class Neg(Function):
     def backward(ctx: Function, *grad_outputs: Any) -> Any:
         # For negation: L = -a, dL/da = -grad_output
         grad_output = grad_outputs[0]
-        a = ctx.saved_tensor
         return (-grad_output,)
 
 
@@ -239,7 +239,8 @@ class Exp(Function):
         """Element-wise exponential: e^a."""
         result = Tensor(
             _apply_elementwise(a, math.exp),
-            dtype=a.dtype, device=a.device,
+            dtype=a.dtype,
+            device=a.device,
         )
         ctx.save_for_backward(a)
         ctx.exp_result = result
@@ -261,7 +262,8 @@ class Log(Function):
         """Element-wise natural logarithm: ln(a)."""
         result = Tensor(
             _apply_elementwise(a, math.log),
-            dtype=a.dtype, device=a.device,
+            dtype=a.dtype,
+            device=a.device,
         )
         ctx.save_for_backward(a)
         return result
