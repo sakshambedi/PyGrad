@@ -40,8 +40,10 @@ def broadcast_shape(shp1: tuple[int, ...], shp2: tuple[int, ...]) -> list[int]:
             result.append(max(a_dim, b_dim))
         else:
             raise ValueError(f"Shapes {shp1} and {shp2} are not broadcast-compatible.")
-    result.extend(reversed(shp1[: len(shp1) - len(shp2)]))
-    result.extend(reversed(shp2[: len(shp2) - len(shp1)]))
+    # Leading dimensions of the longer shape carry over unchanged. Clamp at 0:
+    # a negative slice end would otherwise pull dimensions from the shorter shape.
+    result.extend(reversed(shp1[: max(len(shp1) - len(shp2), 0)]))
+    result.extend(reversed(shp2[: max(len(shp2) - len(shp1), 0)]))
     return list(reversed(result))
 
 
