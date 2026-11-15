@@ -44,34 +44,33 @@ This project is inspired by frameworks like tinygrad and PyTorch, but prioritize
 
 - Tensor creation from scalars/lists
 - Factory methods:
-    - `Tensor.zeros`
-    - `Tensor.ones`
-    - `Tensor.full`
-    - `Tensor.arange`
-    - `Tensor.randn`
+    - `Tensor.zeros`, `Tensor.ones`, `Tensor.full`
+    - `Tensor.arange`, `Tensor.randn`, `Tensor.rand`
+    - `Tensor.eye`
 - Shape/view operations:
     - `view`, `reshape`
     - `transpose`, `Tensor.T`
     - `Tensor.permute`
     - `expand`
 - Elementwise forward ops:
-    - `+`, `-`, `*`, `/`, unary negation
-    - power op is wired in autograd ops module
+    - `+`, `-`, `*`, `/`, unary negation, `**` (power)
+    - `exp`, `log`
+    - Reverse operators (`__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`, `__rpow__`)
+- Reductions:
+    - `sum` (global and per-dimension, with keepdims)
+    - `mean` (global and per-dimension, with keepdims)
+- Matrix multiplication: `matmul`, `@` operator (1D/2D)
+- Autograd:
+    - Full backward implementations: `Add`, `Sub`, `Mul`, `Div`, `Pow`, `Neg`, `Exp`, `Log`, `Sum`
+    - `Tensor.backward()` for end-to-end reverse-mode autodiff
+    - Gradient propagation through arbitrary computation graphs
 - DType system with integer and floating dtypes
 - DType upcasting for binary ops
 - C++-accelerated operation dispatch for unary/binary ops
 - Test suite (Python + C++ integration flow via build/test targets)
 
-### In progress / partial
-
-- Autograd backward coverage beyond basic ops:
-    - `Add.backward`, `Sub.backward`, `Neg.backward` are implemented
-    - `Mul.backward`, `Div.backward`, `Pow.backward` are currently placeholders
-- Full training-oriented API surface (e.g. end-to-end `.backward()` UX)
-
 ### Not implemented yet
 
-- Matrix multiplication (`matmul`, `@`) as public-ready feature
 - Neural network layers / optimizers
 - GPU backend
 
@@ -154,6 +153,8 @@ print("contiguous:", c.is_contigous())  # note: API spelling is currently is_con
 - `Tensor.full(shape, fill_value, **kwargs)`
 - `Tensor.arange(end, start=0, step=1, dtype=..., device="cpu", requires_grad=False)`
 - `Tensor.randn(*shape, **kwargs)`
+- `Tensor.rand(*shape, **kwargs)`
+- `Tensor.eye(n, m=None, **kwargs)`
 
 ### Shape/view ops
 
@@ -166,11 +167,19 @@ print("contiguous:", c.is_contigous())  # note: API spelling is currently is_con
 
 ### Reductions
 
-- `Tensor.sum(tensor, dtype=...)` (current scalar reduction behavior)
+- `sum(dim=None, keepdims=False, dtype=...)`
+- `mean(dim=None, keepdims=False, dtype=...)`
 
 ### Arithmetic operators
 
-- `+`, `-`, `*`, `/`, unary `-`, power (`**`) path exists through autograd op wiring
+- `+`, `-`, `*`, `/`, unary `-`, `**` (power)
+- `exp()`, `log()`
+- `matmul()`, `@` operator
+- Reverse operators: `5 + tensor`, `3 * tensor`, etc.
+
+### Autograd
+
+- `Tensor.backward()` — reverse-mode autodiff through the computation graph
 
 ---
 
@@ -231,10 +240,9 @@ pytest tests/tensor_test.py -v
 
 ## Roadmap (short-term)
 
-- Complete backward implementations for `Mul`, `Div`, and `Pow`
-- Improve gradient propagation UX for practical training loops
-- Add matrix multiplication support
-- Expand reductions and tensor composition ops
+- Neural network layers (Linear, ReLU, Softmax)
+- Optimizers (SGD, Adam)
+- GPU backend
 
 ---
 

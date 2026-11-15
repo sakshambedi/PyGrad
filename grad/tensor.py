@@ -102,10 +102,49 @@ class Tensor:
         return inst
 
     @classmethod
-    def rand(cls, *shape: int, **kw) -> Tensor: ...  # noqa : E704
+    def rand(cls, *shape: int, **kw) -> Tensor:
+        """Create a tensor with random numbers from a uniform distribution [0, 1).
+        Read More: https://docs.pytorch.org/docs/stable/generated/torch.rand.html
+        """
+        size = _prod(shape) if shape else 1
+        random_data = [random.random() for _ in range(size)]
+
+        inst: Tensor = cls.__new__(cls)
+        inst.storage = Buffer(random_data, kw.get("dtype", dtypes.float32))
+        inst.shape = tuple(shape)
+        inst._stride = tensor_stride(inst.shape)
+        inst.device = kw.get("device", "cpu")
+        inst.requires_grad = kw.get("requires_grad", False)
+        inst.grad, inst.grad_fn, inst._contiguous, inst.base_offset = (
+            None,
+            None,
+            True,
+            0,
+        )
+        return inst
 
     @classmethod
-    def eye(cls) -> Tensor: ...  # noqa : E704
+    def eye(cls, n: int, m: int | None = None, **kw) -> Tensor:
+        """Create a 2D identity tensor (ones on diagonal, zeros elsewhere).
+        Read More: https://docs.pytorch.org/docs/stable/generated/torch.eye.html
+        """
+        if m is None:
+            m = n
+        data = [1 if i == j else 0 for i in range(n) for j in range(m)]
+
+        inst: Tensor = cls.__new__(cls)
+        inst.storage = Buffer(data, kw.get("dtype", dtypes.float32))
+        inst.shape = (n, m)
+        inst._stride = tensor_stride(inst.shape)
+        inst.device = kw.get("device", "cpu")
+        inst.requires_grad = kw.get("requires_grad", False)
+        inst.grad, inst.grad_fn, inst._contiguous, inst.base_offset = (
+            None,
+            None,
+            True,
+            0,
+        )
+        return inst
 
     @classmethod
     def randn(cls, *shape: int, **kw) -> Tensor:
@@ -273,10 +312,93 @@ class Tensor:
         return self._stride if dim is None else self._stride[dim % len(self.shape)]
 
     @staticmethod
-    def matmul(t1: Tensor, t2: Tensor, /, dtype: dtypes | None = None): ...  # noqa
+    def matmul(t1: Tensor, t2: Tensor, /, dtype: DTypeLike | None = None) -> Tensor:
+        """Matrix multiplication of two tensors (1D/2D).
+        Read More: https://docs.pytorch.org/docs/stable/generated/torch.matmul.html
+        """
+        if len(t1.shape) < 1 or len(t2.shape) < 1:
+            raise ValueError("matmul requires tensors with at least 1 dimension")
 
-    @staticmethod
-    def mean(t: Tensor, /, axis: int = 0) -> Tensor: ...  # noqa
+        out_dtype = dtype or dtypes._upcast(t1.dtype, t2.dtype)
+        dev = t1.device or "cpu"
+        rg = t1.requires_grad or t2.requires_grad
+
+        # 1D x 1D: dot product → scalar
+        if len(t1.shape) == 1 and len(t2.shape) == 1:
+            n = t1.shape[0]
+            if n != t2.shape[0]:
+                raise ValueError(
+                    f"Dot product requires same length, got {n} and {t2.shape[0]}"
+                )
+            dot = sum(t1[(i,)] * t2[(i,)] for i in range(n))
+            return Tensor(dot, dtype=out_dtype, device=dev)
+
+        # 2D x 2D
+        if len(t1.shape) == 2 and len(t2.shape) == 2:
+            M, K = t1.shape
+            K2, N = t2.shape
+            if K != K2:
+                raise ValueError(
+                    f"matmul shape mismatch: ({M}x{K}) @ ({K2}x{N})"
+                )
+            result = [
+                [sum(t1[(i, k)] * t2[(k, j)] for k in range(K)) for j in range(N)]
+                for i in range(M)
+            ]
+            return Tensor(result, dtype=out_dtype, device=dev, requires_grad=rg)
+
+        # 2D x 1D: matrix-vector → 1D
+        if len(t1.shape) == 2 and len(t2.shape) == 1:
+            M, K = t1.shape
+            if K != t2.shape[0]:
+                raise ValueError(
+                    f"matmul shape mismatch: ({M}x{K}) @ ({t2.shape[0]},)"
+                )
+            result = [sum(t1[(i, k)] * t2[(k,)] for k in range(K)) for i in range(M)]
+            return Tensor(result, dtype=out_dtype, device=dev, requires_grad=rg)
+
+        # 1D x 2D: vector-matrix → 1D
+        if len(t1.shape) == 1 and len(t2.shape) == 2:
+            K = t1.shape[0]
+            K2, N = t2.shape
+            if K != K2:
+                raise ValueError(
+                    f"matmul shape mismatch: ({K},) @ ({K2}x{N})"
+                )
+            result = [sum(t1[(k,)] * t2[(k, j)] for k in range(K)) for j in range(N)]
+            return Tensor(result, dtype=out_dtype, device=dev, requires_grad=rg)
+
+        raise ValueError(
+            f"matmul not supported for tensors with shapes {t1.shape} and {t2.shape}"
+        )
+
+    def mean(
+        self,
+        dim: int | None = None,
+        keepdims: bool = False,
+        *,
+        dtype: DType | None = None,
+    ) -> Tensor:
+        """Compute the mean along the given dimension.
+        Read More: https://docs.pytorch.org/docs/stable/generated/torch.mean.html
+        """
+        out_dtype = dtype if dtype is not None else self.dtype
+
+        if dim is None:
+            s = self.sum(dtype=out_dtype)
+            count = _prod(self.shape) if self.shape else 1
+            return s / Tensor(count, dtype=out_dtype)
+
+        ndim = len(self.shape)
+        axis = dim + ndim if dim < 0 else dim
+        if axis < 0 or axis >= ndim:
+            raise IndexError(
+                f"Dimension out of range (expected to be in range of [{-ndim}, {ndim - 1}], but got {dim})"
+            )
+
+        s = self.sum(dim=dim, keepdims=keepdims, dtype=out_dtype)
+        count = self.shape[axis]
+        return s / Tensor(count, dtype=out_dtype)
 
     def sum(
         self,
@@ -287,6 +409,15 @@ class Tensor:
     ) -> Tensor:
         if self.storage is None:
             raise AttributeError("Tensor with data is not initialized yet!")
+
+        # Use autograd Sum when gradient tracking is needed
+        if self.requires_grad:
+            from grad.autograd.ops import Sum
+
+            result = Sum.apply(self, dim=dim, keepdims=keepdims)
+            if dtype is not None and dtype != self.dtype:
+                pass  # dtype cast not yet supported in autograd path
+            return result
 
         out_dtype = dtype if dtype is not None else self.dtype
 
@@ -367,6 +498,98 @@ class Tensor:
 
         return Neg.apply(self)
 
+    def __matmul__(self, other):
+        if not isinstance(other, Tensor):
+            other = Tensor(other, dtype=self.dtype)
+        return Tensor.matmul(self, other)
+
+    def __radd__(self, other):
+        if not isinstance(other, Tensor):
+            other = Tensor(other, dtype=self.dtype)
+        return other + self
+
+    def __rsub__(self, other):
+        if not isinstance(other, Tensor):
+            other = Tensor(other, dtype=self.dtype)
+        return other - self
+
+    def __rmul__(self, other):
+        if not isinstance(other, Tensor):
+            other = Tensor(other, dtype=self.dtype)
+        return other * self
+
+    def __rtruediv__(self, other):
+        if not isinstance(other, Tensor):
+            other = Tensor(other, dtype=self.dtype)
+        return other / self
+
+    def __rpow__(self, other):
+        if not isinstance(other, Tensor):
+            other = Tensor(other, dtype=self.dtype)
+        return other ** self
+
+    def exp(self) -> Tensor:
+        from grad.autograd.ops import Exp
+
+        return Exp.apply(self)
+
+    def log(self) -> Tensor:
+        from grad.autograd.ops import Log
+
+        return Log.apply(self)
+
+    def backward(self, gradient: Tensor | None = None) -> None:
+        """Compute gradients via reverse-mode autodiff (backpropagation)."""
+        if not self.requires_grad:
+            raise RuntimeError("backward() called on a tensor that doesn't require grad")
+
+        if gradient is None:
+            if self.shape == () or _prod(self.shape) == 1:
+                gradient = Tensor.ones(self.shape if self.shape else (1,), dtype=self.dtype)
+            else:
+                raise RuntimeError(
+                    "gradient must be specified for non-scalar outputs"
+                )
+
+        # Topological sort
+        topo_order: list[Tensor] = []
+        visited: set[int] = set()
+
+        def _build_topo(t: Tensor) -> None:
+            tid = id(t)
+            if tid in visited:
+                return
+            visited.add(tid)
+            if t.grad_fn is not None:
+                for inp in t.grad_fn.saved_tensor:
+                    if isinstance(inp, Tensor) and inp.requires_grad:
+                        _build_topo(inp)
+            topo_order.append(t)
+
+        _build_topo(self)
+
+        self.grad = gradient
+
+        for node in reversed(topo_order):
+            if node.grad_fn is None:
+                continue
+            grads = node.grad_fn.backward(node.grad_fn, node.grad)
+            if not isinstance(grads, tuple):
+                grads = (grads,)
+
+            saved = node.grad_fn.saved_tensor
+            if not isinstance(saved, tuple):
+                saved = (saved,)
+
+            for inp, g in zip(saved, grads):
+                if not isinstance(inp, Tensor) or not inp.requires_grad:
+                    continue
+                if g is None:
+                    continue
+                if not isinstance(g, Tensor):
+                    g = Tensor(g, dtype=inp.dtype)
+                inp.grad = g if inp.grad is None else inp.grad + g
+
     def _offset(self, index):
         return self.base_offset + sum(i * s for i, s in zip(index, self._stride))
 
@@ -401,9 +624,18 @@ class Tensor:
         offsetval = self._offset(tuple(norm))
         return storage[offsetval]
 
+    def tolist(self) -> list | int | float:
+        """Convert tensor to a nested Python list (or scalar)."""
+        return self._to_nested()
+
     def to_numpy(self):
-        """Convert tensor to numpy array."""
-        import numpy as np
+        """Convert tensor to numpy array. Requires numpy to be installed."""
+        try:
+            import numpy as np
+        except ImportError:
+            raise ImportError(
+                "numpy is required for to_numpy(). Install it with: pip install numpy"
+            ) from None
 
         if self.storage is None:
             raise AttributeError("Tensor with data is not initialized yet!")
@@ -412,7 +644,6 @@ class Tensor:
             arr = np.array(self.storage.to_list(), dtype=self.dtype.fmt)
             return arr.reshape(self.shape)
 
-        # Respect view strides for non-contiguous tensors (e.g. transpose/expand).
         flat = [self[idx] for idx in _nd_indices(self.shape)]
         return np.array(flat, dtype=self.dtype.fmt).reshape(self.shape)
 
