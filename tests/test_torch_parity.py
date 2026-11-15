@@ -267,7 +267,9 @@ def test_multi_layer_network_matches_torch(dtype):
 
 VIEWS = {
     "transpose": lambda t: t.transpose(0, 1),
-    "permute": lambda t: t.permute(1, 0) if isinstance(t, torch.Tensor) else Tensor.permute(t, 1, 0),
+    "permute": lambda t: (
+        t.permute(1, 0) if isinstance(t, torch.Tensor) else Tensor.permute(t, 1, 0)
+    ),
     "reshape": lambda t: t.reshape(3, 2),
     "expand": lambda t: t.reshape(1, 2, 3).expand(4, 2, 3),
 }
