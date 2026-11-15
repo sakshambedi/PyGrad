@@ -60,6 +60,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(eigen)
 include_directories(${eigen_SOURCE_DIR})
 
+# Resolve Python before pybind11 so both use the same interpreter. If pybind11
+# runs its own search first it can pick a different Python, and the kernels are
+# then compiled against one version's headers and linked against another's
+# library.
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
 # Fetch and setup pybind11
 FetchContent_Declare(
     pybind11
@@ -67,8 +73,6 @@ FetchContent_Declare(
     GIT_TAG        v2.11.1
 )
 FetchContent_MakeAvailable(pybind11)
-
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 # Detect and configure xsimd include directories
 if(DEFINED ENV{XSIMD_INCLUDE_DIR})
@@ -100,7 +104,7 @@ add_library(cpu_kernel_lib STATIC
     kernels/operations.h
     kernels/operations.cpp)
 target_include_directories(cpu_kernel_lib PRIVATE
-    ${PYTHON_INCLUDE_DIRS}
+    ${Python3_INCLUDE_DIRS}
     ${pybind11_SOURCE_DIR}/include
     ${XSIMD_INCLUDE_DIR}
 )
@@ -112,7 +116,7 @@ pybind11_add_module(cpu_kernel
     kernels/operations.h
     kernels/operations.cpp)
 target_include_directories(cpu_kernel PRIVATE
-    ${PYTHON_INCLUDE_DIRS}
+    ${Python3_INCLUDE_DIRS}
     ${XSIMD_INCLUDE_DIR}
 )
 

@@ -44,34 +44,39 @@ This project is inspired by frameworks like tinygrad and PyTorch, but prioritize
 
 - Tensor creation from scalars/lists
 - Factory methods:
-    - `Tensor.zeros`
-    - `Tensor.ones`
-    - `Tensor.full`
-    - `Tensor.arange`
-    - `Tensor.randn`
+    - `Tensor.zeros`, `Tensor.ones`, `Tensor.full`
+    - `Tensor.arange`, `Tensor.randn`, `Tensor.rand`
+    - `Tensor.eye`
 - Shape/view operations:
     - `view`, `reshape`
     - `transpose`, `Tensor.T`
     - `Tensor.permute`
     - `expand`
 - Elementwise forward ops:
-    - `+`, `-`, `*`, `/`, unary negation
-    - power op is wired in autograd ops module
+    - `+`, `-`, `*`, `/`, unary negation, `**` (power)
+    - `exp`, `log`
+    - Reverse operators (`__radd__`, `__rsub__`, `__rmul__`, `__rtruediv__`, `__rpow__`)
+- Reductions:
+    - `sum` (global and per-dimension, with keepdims)
+    - `mean` (global and per-dimension, with keepdims)
+- Matrix multiplication: `matmul`, `@` operator (1D/2D)
+- Autograd:
+    - Full backward implementations: `Add`, `Sub`, `Mul`, `Div`, `Pow`, `Neg`, `Exp`, `Log`, `Sum`
+    - `Tensor.backward()` for end-to-end reverse-mode autodiff
+    - Gradient propagation through graphs built from the ops above, including broadcasting and reused nodes
 - DType system with integer and floating dtypes
 - DType upcasting for binary ops
-- C++-accelerated operation dispatch for unary/binary ops
-- Test suite (Python + C++ integration flow via build/test targets)
+- C++ SIMD kernels for `+`, `-`, `*`, `/`, `**` and unary negation
+- Test suite: pytest, C++ GoogleTest, and a PyTorch comparison (see [Testing](#testing))
 
-### In progress / partial
+### Known limitations
 
-- Autograd backward coverage beyond basic ops:
-    - `Add.backward`, `Sub.backward`, `Neg.backward` are implemented
-    - `Mul.backward`, `Div.backward`, `Pow.backward` are currently placeholders
-- Full training-oriented API surface (e.g. end-to-end `.backward()` UX)
+- `matmul` / `@` computes forward values only; it has no backward, so gradients do not flow through it
+- `view`, `reshape`, `transpose`, `permute` and `expand` do not propagate gradients
+- `exp`, `log`, `sum`, `mean` and `matmul` are pure-Python loops, not C++ kernels
 
 ### Not implemented yet
 
-- Matrix multiplication (`matmul`, `@`) as public-ready feature
 - Neural network layers / optimizers
 - GPU backend
 
@@ -81,7 +86,7 @@ This project is inspired by frameworks like tinygrad and PyTorch, but prioritize
 
 ## Prerequisites
 
-- Python `>=3.8`
+- Python `>=3.8` (CI tests Python 3.11 only)
 - C++17 compiler
 - CMake (recommended `>=3.14`)
 - `pybind11`
@@ -106,8 +111,8 @@ make install        # pip install -e .
 
 ```bash
 make debug          # debug build
-make test           # build + run tests
-make test-debug     # debug build + tests
+make test           # build + run the C++ GoogleTest suite
+make test-debug     # debug build + C++ GoogleTest suite
 make clean          # remove build artifacts
 make help           # show all make targets
 ```
@@ -154,6 +159,8 @@ print("contiguous:", c.is_contigous())  # note: API spelling is currently is_con
 - `Tensor.full(shape, fill_value, **kwargs)`
 - `Tensor.arange(end, start=0, step=1, dtype=..., device="cpu", requires_grad=False)`
 - `Tensor.randn(*shape, **kwargs)`
+- `Tensor.rand(*shape, **kwargs)`
+- `Tensor.eye(n, m=None, **kwargs)`
 
 ### Shape/view ops
 
@@ -166,11 +173,19 @@ print("contiguous:", c.is_contigous())  # note: API spelling is currently is_con
 
 ### Reductions
 
-- `Tensor.sum(tensor, dtype=...)` (current scalar reduction behavior)
+- `sum(dim=None, keepdims=False, dtype=...)`
+- `mean(dim=None, keepdims=False, dtype=...)`
 
 ### Arithmetic operators
 
-- `+`, `-`, `*`, `/`, unary `-`, power (`**`) path exists through autograd op wiring
+- `+`, `-`, `*`, `/`, unary `-`, `**` (power)
+- `exp()`, `log()`
+- `matmul()`, `@` operator
+- Reverse operators: `5 + tensor`, `3 * tensor`, etc.
+
+### Autograd
+
+- `Tensor.backward()` — reverse-mode autodiff through the computation graph
 
 ---
 
@@ -204,9 +219,10 @@ pygrad/
 │   ├── vecbuffer.cpp/.h
 │   └── operations.cpp/.h
 ├── tests/
-│   ├── tensor_test.py
-│   ├── ops_test.py
-│   └── test_buffer.py
+│   ├── tensor_test.py, ops_test.py, test_buffer.py, test_autograd.py, ...
+│   ├── test_torch_parity.py   # PyGrad vs PyTorch (optional, needs torch)
+│   └── kernels/               # C++ GoogleTest suite
+├── Dockerfile
 ├── pyproject.toml
 ├── setup.py
 └── makefile
@@ -216,25 +232,66 @@ pygrad/
 
 ## Testing
 
+### Python tests
+
 ```bash
-# Run full test flow
-make test
+uv sync --dev
+uv pip install setuptools wheel pybind11
+uv run python setup.py build_ext --inplace
 
-# Run Python tests directly
-pytest -v
+uv run pytest -q                        # every file under tests/
+uv run pytest tests/tensor_test.py -v   # a single file
+```
 
-# Run a single test file
-pytest tests/tensor_test.py -v
+### C++ kernel tests (GoogleTest)
+
+```bash
+cmake -S . -B build/ctest -DCMAKE_BUILD_TYPE=Release -DPYGRAD_BUILD_KERNEL_TESTS=ON \
+  -DPython3_EXECUTABLE="$(uv run python -c 'import sys; print(sys.executable)')" -Wno-dev
+cmake --build build/ctest --parallel
+
+# The tests embed a Python interpreter that must be able to import numpy.
+PYTHONPATH="$(uv run python -c 'import site; print(site.getsitepackages()[0])')" \
+  ctest --test-dir build/ctest --output-on-failure --timeout 120
+```
+
+### Comparison against PyTorch
+
+`tests/test_torch_parity.py` builds the same computation in PyGrad and in PyTorch from identical inputs and asserts that the results have the same shape and agree within `rtol=1e-5, atol=1e-6` for `float32` and `rtol=1e-12, atol=1e-12` for `float64`. PyTorch is optional; without it the file is skipped.
+
+```bash
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv run pytest tests/test_torch_parity.py -v
+```
+
+| Compared | Operations |
+| --- | --- |
+| Forward values and gradients | `+`, `-`, `*`, `/`, `**` (equal shapes and broadcasting), Python-scalar operands (`2 + t`, `t ** 3`, ...), unary `-`, `exp`, `log`, `sum` and `mean` (global, per dimension, `keepdims`), graphs that reuse a node, and a 4-5-4-3 sigmoid network with a mean-squared-error loss |
+| Forward values only | `matmul` / `@` (1D and 2D), and `+`, `*`, `/`, unary `-`, `exp`, `sum`, `mean` applied to `transpose` / `permute` / `reshape` / `expand` views |
+| Not comparable yet | Gradients of `matmul` and gradients through views. Neither is implemented; both are kept as strict `xfail` tests so they start failing as soon as they are |
+
+Because `matmul` has no backward, the network test writes each linear layer as a broadcast multiply followed by `sum`, which is the same arithmetic. Anything not listed in the table (integer and `float16` dtypes, factory methods, indexing) is not compared against PyTorch.
+
+### Platforms
+
+CI (`.github/workflows/native-extension-ci.yml`) builds the extension and runs the pytest suite, the GoogleTest suite and the PyTorch comparison on `ubuntu-latest` and `macos-latest` with Python 3.11. Windows build scripts exist in the repository but are not tested.
+
+### Docker
+
+The `Dockerfile` builds the extension on Linux and runs the pytest and GoogleTest suites as part of the image build, so the build fails if a test fails. It does not install PyTorch.
+
+```bash
+docker build -t pygrad .
+docker run --rm pygrad      # re-runs the Python tests
 ```
 
 ---
 
 ## Roadmap (short-term)
 
-- Complete backward implementations for `Mul`, `Div`, and `Pow`
-- Improve gradient propagation UX for practical training loops
-- Add matrix multiplication support
-- Expand reductions and tensor composition ops
+- Neural network layers (Linear, ReLU, Softmax)
+- Optimizers (SGD, Adam)
+- GPU backend
 
 ---
 

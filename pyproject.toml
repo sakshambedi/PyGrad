@@ -8,6 +8,8 @@ version = "0.12.61"
 description = "A minimalistic autograd engine"
 authors = [{ name = "Saksham Bedi", email = "hello@sakshambedi.com" }]
 requires-python = ">=3.8"
+# numpy is a runtime dependency: the C++ Buffer(list, dtype) constructor
+# imports it, so creating any Tensor from Python data needs it.
 dependencies = [
     "numpy>=1.21.6",
 ]

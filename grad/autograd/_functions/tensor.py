@@ -20,12 +20,14 @@ def _elementwise_operation(ctx, a: Tensor, b: Tensor, op_type: operations.Binary
     if tuple(a.shape) == ():
         a_in = Tensor.full(out_shape, a.item(), dtype=rdtype)
     else:
-        a_in = a if tuple(a.shape) == out_shape else Tensor._contiguous_tensor(a.expand(*out_shape))
+        # The backend reads raw storage in order, so a strided view (transpose,
+        # permute, expand) has to be copied into a contiguous buffer first.
+        a_in = Tensor._contiguous_tensor(a if tuple(a.shape) == out_shape else a.expand(*out_shape))
 
     if tuple(b.shape) == ():
         b_in = Tensor.full(out_shape, b.item(), dtype=rdtype)
     else:
-        b_in = b if tuple(b.shape) == out_shape else Tensor._contiguous_tensor(b.expand(*out_shape))
+        b_in = Tensor._contiguous_tensor(b if tuple(b.shape) == out_shape else b.expand(*out_shape))
 
     ctx.save_for_backward(a, b)
     ctx.a_shape = tuple(a.shape)
@@ -53,12 +55,14 @@ def _unary_operation(ctx, a: Tensor, op_type: operations.UnaryOpType):
 
     ctx.save_for_backward(a)
 
-    cpp_result_buffer = operations.unary_op(a.storage._storage, op_type, a.dtype.name)
+    # The backend reads raw storage in order, so copy strided views first.
+    a_in = Tensor._contiguous_tensor(a)
+    cpp_result_buffer = operations.unary_op(a_in.storage._storage, op_type, a.dtype.name)
     result = Tensor.__new__(Tensor)
     result.shape = tuple(a.shape)
     result._stride = tensor_stride(result.shape)
     result.device = a.device or "cpu"
-    result._contiguous = a._contiguous
+    result._contiguous = True  # the result owns a fresh, densely packed buffer
     result.base_offset = 0
     result.storage = Buffer._from_cpp_buffer(cpp_result_buffer, a.dtype)
     result.grad, result.grad_fn, result.requires_grad = None, None, None

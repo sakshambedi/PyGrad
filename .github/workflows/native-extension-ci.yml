@@ -73,10 +73,33 @@ jobs:
                   print(operations.__name__)
                   PY
 
+            # Runs every file under tests/. PyTorch is not installed yet, so
+            # tests/test_torch_parity.py is skipped here and run in its own step below.
             - name: Run Python tests
+              run: uv run pytest -q -rs
+
+            - name: Build C++ kernel tests (GoogleTest)
               run: |
-                  uv run pytest -q \
-                    tests/test_kernel_import.py \
-                    tests/test_buffer.py \
-                    tests/tensor_test.py \
-                    tests/ops_test.py
+                  cmake -S . -B build/ctest \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DPYGRAD_BUILD_KERNEL_TESTS=ON \
+                    -DPython3_EXECUTABLE="$(uv run python -c 'import sys; print(sys.executable)')" \
+                    -Wno-dev
+                  cmake --build build/ctest --parallel
+
+            # The tests embed the base interpreter, which does not see the virtual
+            # environment, so point it at the environment's site-packages for numpy.
+            - name: Run C++ kernel tests (GoogleTest)
+              run: |
+                  export PYTHONPATH="$(uv run python -c 'import site; print(site.getsitepackages()[0])')"
+                  ctest --test-dir build/ctest --output-on-failure --timeout 120
+
+            - name: Install PyTorch (CPU build) for the parity tests
+              run: uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+            # Importing torch first makes this step fail, rather than skip, if the
+            # install above did not work.
+            - name: Compare forward values and gradients against PyTorch
+              run: |
+                  uv run python -c "import torch; print('torch', torch.__version__)"
+                  uv run pytest -q -rxs tests/test_torch_parity.py

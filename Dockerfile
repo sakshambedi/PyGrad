@@ -1,38 +1,42 @@
-FROM python:3.13-slim
+# Builds the native extension on Linux and runs both test suites during the
+# image build, so `docker build .` fails if any test fails.
+#
+#   docker build -t pygrad .
+#   docker run --rm pygrad            # re-runs the Python tests
+#
+# Python 3.11 matches the version CI tests.
+FROM python:3.11-slim
 
-# Install minimal tooling for setup script
+# Compiler toolchain, CMake, and the header-only libraries the kernels include.
+# git is needed because CMake fetches pybind11 and GoogleTest at configure time.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    git \
-    sudo \
-    bash \
-    curl \
-    zip \
-    unzip \
-    tar \
+        build-essential \
+        ca-certificates \
+        cmake \
+        git \
+        libeigen3-dev \
+        libxsimd-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# Copy code and helper scripts
 COPY . /app
 
-# Ensure the prerequisite installer is executable and run it
-RUN chmod +x /app/scripts/setup_prerequisite.sh && \
-    /app/scripts/setup_prerequisite.sh
+# Runtime dependency (numpy), build tooling, and the test dependencies.
+RUN pip install --no-cache-dir numpy setuptools wheel pybind11 "pytest>=7.4.4"
 
-# Expose vcpkg and include paths for downstream builds
-ENV VCPKG_ROOT=/usr/local/vcpkg \
-    XSIMD_INCLUDE_DIR=/usr/local/vcpkg/installed/x64-linux/include \
-    EIGEN3_INCLUDE_DIR=/usr/include/eigen3 \
-    CMAKE_TOOLCHAIN_FILE=/usr/local/vcpkg/scripts/buildsystems/vcpkg.cmake
+# Build the two pybind11 extension modules in place (same command as CI).
+RUN python setup.py build_ext --inplace
 
-# Install Python deps, build & install the package, and run C++ tests
-RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+# Python tests. tests/test_torch_parity.py is skipped: PyTorch is not installed.
+RUN pytest -q
 
-RUN rm -rf build && chmod +x run_cpp_tests.sh
-RUN ./run_cpp_tests.sh
+# C++ GoogleTest suite.
+RUN cmake -S . -B build/ctest \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DPYGRAD_BUILD_KERNEL_TESTS=ON \
+        -Wno-dev && \
+    cmake --build build/ctest --parallel && \
+    ctest --test-dir build/ctest --output-on-failure --timeout 120
 
-# Default command: run Python tests
-# CMD ["pytest", "-v"]
+CMD ["pytest", "-q"]
